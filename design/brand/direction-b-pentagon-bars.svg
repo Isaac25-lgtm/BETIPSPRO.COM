@@ -1,0 +1,8 @@
+<!-- Direction B: "Pentagon bars". A football panel with an ascending bar chart cut into it. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Brand mark direction B">
+  <rect x="2" y="2" width="44" height="44" rx="12" fill="#001424"/>
+  <path d="M24 7 40.2 18.8 34 37.8H14L7.8 18.8Z" fill="#1df992"/>
+  <rect x="15.5" y="25" width="4.2" height="8" rx="1.2" fill="#001424"/>
+  <rect x="21.9" y="20.5" width="4.2" height="12.5" rx="1.2" fill="#001424"/>
+  <rect x="28.3" y="15.5" width="4.2" height="17.5" rx="1.2" fill="#001424"/>
+</svg>

@@ -1,0 +1,7 @@
+<!-- Direction C: "Evidence lens". A magnifying lens whose glass is a pitch with a distribution curve. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Brand mark direction C">
+  <circle cx="21" cy="21" r="15" fill="#001424" stroke="#1df992" stroke-width="4"/>
+  <path d="M9.5 26c3.2 0 4.6-11 11.5-11s8.3 11 11.5 11" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M21 9v24" stroke="#1df992" stroke-opacity=".55" stroke-width="1.4" stroke-dasharray="2 2.4"/>
+  <path d="M32 32l9.5 9.5" stroke="#1df992" stroke-width="5.5" stroke-linecap="round"/>
+</svg>

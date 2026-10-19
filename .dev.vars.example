@@ -1,0 +1,21 @@
+# Copy to .dev.vars for local development. .dev.vars is gitignored.
+# Never commit real credentials. Never paste keys into chat.
+
+# One-time admin bootstrap token (any long random string). Used once by `npm run setup:local`.
+ADMIN_BOOTSTRAP_TOKEN=generate-a-long-random-string
+# Pepper mixed into session/invite hashes.
+SESSION_SECRET=generate-a-second-long-random-string
+
+# API-Football (API-SPORTS) key - leave blank to stay in demo mode.
+# Get it ONLY from https://dashboard.api-football.com/ (one free account). Then set SPORTS_PROVIDER=api_football.
+API_FOOTBALL_KEY=
+# SPORTS_PROVIDER=api_football
+
+# Optional Turnstile (bot protection) - disabled locally by default.
+TURNSTILE_SECRET_KEY=
+
+# Optional Gemini via Vertex AI - OFF in beta. Paste a dedicated, budget-limited service-account JSON only after owner approval.
+VERTEX_SERVICE_ACCOUNT_JSON=
+VERTEX_PROJECT_ID=
+VERTEX_LOCATION=us-central1
+VERTEX_MODEL=gemini-2.5-flash

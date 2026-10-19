@@ -1,0 +1,22 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { cloudflare } from "@cloudflare/vite-plugin";
+
+// One deployable unit: the React SPA is served as Worker static assets and
+// /api/* is handled by the Worker (see wrangler.jsonc run_worker_first).
+export default defineConfig({
+  // FIP_PERSIST lets E2E runs use an isolated local D1 state directory.
+  plugins: [react(), cloudflare(process.env.FIP_PERSIST ? { persistState: { path: process.env.FIP_PERSIST } } : {})],
+  build: {
+    target: "es2022",
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom", "react-router"],
+        },
+      },
+    },
+  },
+  server: { port: Number(process.env.PORT ?? 5173), strictPort: true },
+});

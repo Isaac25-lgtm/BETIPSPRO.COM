@@ -1,0 +1,45 @@
+{
+  // Cloudflare Workers config. NO SECRETS IN THIS FILE.
+  // Secrets: .dev.vars locally (gitignored); `wrangler secret put` for deployed envs (owner approval required).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "football-research-platform",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "fip-beta",
+      // Placeholder for local development. Replace with the real id from
+      // `wrangler d1 create fip-beta` ONLY when the owner authorises Cloudflare setup.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "APP_ENV": "development",
+    "SPORTS_PROVIDER": "demo",
+    "SPORTS_API_FREE_MODE": "true",
+    "SPORTS_API_DAILY_BUDGET": "80",
+    "SPORTS_API_DAILY_HARD_CAP": "100",
+    "SPORTS_API_PER_MINUTE_MAX": "10",
+    "AI_EXPLANATIONS_ENABLED": "false",
+    "AI_MONTHLY_BUDGET_USD": "0",
+    "PAYMENTS_ENABLED": "false",
+    "BETA_INVITE_ONLY": "true",
+    "MAX_BETA_USERS": "5",
+    "BETA_INITIAL_CREDITS": "10",
+    "BETA_CREDITS_EXPIRE": "false",
+    "PUBLIC_PERFORMANCE_ONLY_VERIFIED": "true",
+    "TURNSTILE_ENABLED": "false"
+  },
+  // Scheduled ingestion is defined but only does work when SPORTS_PROVIDER=api_football
+  // and a key is configured; every upstream call goes through the shared D1 budget gateway.
+  "triggers": { "crons": ["15 */3 * * *"] }
+}

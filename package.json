@@ -1,0 +1,56 @@
+{
+  "name": "football-research-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Football match evidence and probability research platform (beta). Owner: Motion Imprints Technologies. Public brand not yet approved.",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "npm run build && wrangler dev --port 8787",
+    "typecheck": "tsc -b",
+    "db:migrate": "wrangler d1 migrations apply DB --local",
+    "db:seed": "node scripts/seed-demo.mjs",
+    "db:reset": "node scripts/reset-local-db.mjs && npm run db:migrate && npm run db:seed",
+    "setup:local": "node scripts/setup-local.mjs",
+    "beta:bootstrap": "node scripts/beta-bootstrap.mjs",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration tests/security",
+    "test:e2e": "playwright test",
+    "test:visual": "playwright test tests/e2e/visual.spec.ts",
+    "test:load": "node tests/performance/load-test.mjs",
+    "model:test": "cd model-pipeline && python -m pytest -q",
+    "model:demo": "cd model-pipeline && python -m fip_model.cli demo --out ../fixtures/demo/demo-artifact.json",
+    "brand:render": "python design/scripts/render_art.py",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "5.2.8",
+    "hono": "4.10.7",
+    "lucide-react": "0.555.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-router": "7.9.6",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.15.2",
+    "@cloudflare/workers-types": "4.20251125.0",
+    "@playwright/test": "1.62.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.0",
+    "@types/node": "22.19.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "jsdom": "26.1.0",
+    "typescript": "5.9.3",
+    "vite": "7.2.4",
+    "vitest": "3.2.4",
+    "wrangler": "4.50.0"
+  }
+}

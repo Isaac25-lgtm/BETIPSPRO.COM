@@ -1,0 +1,33 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: CI-only local secrets (random, never real)
+        run: |
+          echo "ADMIN_BOOTSTRAP_TOKEN=$(openssl rand -hex 24)" > .dev.vars
+          echo "SESSION_SECRET=$(openssl rand -hex 32)" >> .dev.vars
+      - run: npx tsc -b
+      - run: npm test
+      - run: npm run build
+  models:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy pandas scipy statsmodels pytest
+      - run: cd model-pipeline && python -m pytest -q

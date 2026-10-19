@@ -1,0 +1,23 @@
+# DISABLED BY DEFAULT. Deploys a Cloudflare preview only when manually dispatched AND the
+# repository variable CLOUDFLARE_DEPLOY_APPROVED is "true" (owner approval). See docs/cloudflare-deploy-runbook.md.
+name: Preview deploy (manual, owner-approved)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview:
+    if: ${{ vars.CLOUDFLARE_DEPLOY_APPROVED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npm run build
+      - name: Upload preview version (does not promote to production)
+        run: npx wrangler versions upload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

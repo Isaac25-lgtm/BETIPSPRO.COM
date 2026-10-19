@@ -1,0 +1,18 @@
+[project]
+name = "fip-model"
+version = "0.1.0"
+description = "Offline statistical pipeline for the football research platform (beta)."
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.1",
+  "scipy>=1.11",
+  "statsmodels>=0.14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

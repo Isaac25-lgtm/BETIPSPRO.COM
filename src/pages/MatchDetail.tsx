@@ -5,7 +5,7 @@ import { useAuth } from "../app/auth";
 import { api, ApiError, idempotencyKey, invalidate, useApi } from "../lib/api";
 import { dateTime, kickoffTime, longDate, metricLabels, odds, pct, statusLabel, utcTime } from "../lib/format";
 import type { FormEntry, Preview, Report, ReportMarket } from "../lib/types";
-import { DemoPill, ErrorState, LockedValue, Notice, ProbBar, QualityPill, Skeleton, TeamBadge } from "../components/ui";
+import { DemoPill, ErrorState, LockedValue, Notice, ProbBar, QualityPill, Skeleton, TeamBadge, teamLabel } from "../components/ui";
 import { FormStrip, PmfBars, ScorelineHeatmap } from "../components/charts";
 
 const TABS = [
@@ -30,6 +30,7 @@ export default function MatchDetail() {
   const canTry = !!fx?.report.available && (fx.is_public_sample || !!me?.user);
   const report = useApi<Report>(canTry ? `/fixtures/${encodeURIComponent(id)}/report` : null, { ttlMs: 120_000 });
   const locked = !report.data;
+  const [unlockNote, setUnlockNote] = useState<string | null>(null);
   const lockReason = report.error?.code;
 
   if (preview.error) return <div className="container section-tight"><ErrorState title={preview.error.status === 404 ? "Match not found" : "Could not load this match"} message={preview.error.message} onRetry={preview.reload} /></div>;
@@ -58,11 +59,11 @@ export default function MatchDetail() {
         </div>
       </div>
       <div className="container match-body">
-        {fx.is_synthetic && <Notice tone="demo"><strong>SYNTHETIC DEMO DATA: NOT A REAL FORECAST.</strong> Teams, results, statistics and prices on this page are fictional and exist only to demonstrate the product.</Notice>}
+        {unlockNote && <p className="form-ok unlock-note" role="status">{unlockNote}</p>}
         {report.loading && canTry && !report.data ? (
           <div className="card card-pad"><Skeleton h={22} w="40%" /><Skeleton h={160} style={{ marginTop: 14 }} /></div>
         ) : locked ? (
-          <LockedView p={preview.data} tab={tab} reason={lockReason} onUnlocked={report.reload} />
+          <LockedView p={preview.data} tab={tab} reason={lockReason} onUnlocked={(note) => { setUnlockNote(note); report.reload(); }} />
         ) : (
           <ReportView p={preview.data} r={report.data!} tab={tab} setTab={setTab} />
         )}
@@ -124,7 +125,7 @@ function MatchHeader({ p }: { p: Preview }) {
 
 // ---------------------------------------------------------------- locked / free preview
 
-function UnlockCard({ p, reason, onUnlocked }: { p: Preview; reason?: string; onUnlocked: () => void }) {
+function UnlockCard({ p, reason, onUnlocked }: { p: Preview; reason?: string; onUnlocked: (note: string) => void }) {
   const { me, refresh } = useAuth();
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -147,11 +148,12 @@ function UnlockCard({ p, reason, onUnlocked }: { p: Preview; reason?: string; on
     setMsg(null);
     try {
       const r = await api<{ charged: boolean; balance: number; free_reason?: string }>(`/fixtures/${encodeURIComponent(f.id)}/unlock`, { method: "POST", headers: { "Idempotency-Key": key } });
-      setMsg({ tone: "ok", text: r.charged ? `Report unlocked. 1 credit used, ${r.balance} left.` : "Already unlocked. No credit used." });
+      const note = r.charged ? `Report unlocked. 1 credit used, ${r.balance} left.` : "Already unlocked. No credit used.";
+      setMsg({ tone: "ok", text: note });
       invalidate(`/fixtures/${encodeURIComponent(f.id)}`);
       invalidate("/me");
       refresh();
-      onUnlocked();
+      onUnlocked(note);
     } catch (e) {
       const err = e as ApiError;
       setMsg({ tone: "err", text: err.message });
@@ -186,7 +188,7 @@ function UnlockCard({ p, reason, onUnlocked }: { p: Preview; reason?: string; on
   );
 }
 
-function LockedView({ p, tab, reason, onUnlocked }: { p: Preview; tab: TabId; reason?: string; onUnlocked: () => void }) {
+function LockedView({ p, tab, reason, onUnlocked }: { p: Preview; tab: TabId; reason?: string; onUnlocked: (note: string) => void }) {
   const f = p.fixture;
   return (
     <div className="match-grid">
@@ -235,7 +237,7 @@ function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; 
   return (
     <div className="match-grid">
       <div className="match-col">
-        {r.access === "sample" && <Notice tone="info">This is the <strong>free sample report</strong>. Every section is open so you can see exactly what a credit unlocks.</Notice>}
+        {r.access === "sample" && <p className="sample-note"><Info size={15} aria-hidden="true" /> Free sample report: every section is open, exactly as a credit unlocks it.</p>}
         {tab === "overview" && (
           <>
             <section className="card card-pad">
@@ -248,7 +250,7 @@ function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; 
                   const m = get(id);
                   return (
                     <Link key={id} to={`/matches/${encodeURIComponent(f.id)}/markets/${id}`} className="x12-cell">
-                      <span className="x12-k">{i === 0 ? f.home.name : i === 1 ? "Draw" : f.away.name}</span>
+                      <span className="x12-k">{i === 0 ? teamLabel(f.home, 12) : i === 1 ? "Draw" : teamLabel(f.away, 12)}</span>
                       <span className="x12-v num">{pct(m?.probability)}</span>
                       <ProbBar p={m?.probability ?? null} lo={m?.uncertainty?.p05} hi={m?.uncertainty?.p95} width={140} />
                       <span className="tiny muted">90% range {pct(m?.uncertainty?.p05)}–{pct(m?.uncertainty?.p95)}</span>
@@ -351,7 +353,7 @@ export function MarketList({ markets, fixtureId, locked }: { markets: ReportMark
               </span>
             )}
             {!locked && <span className="ml-price num" title={m.price ? `${m.price.bookmaker}${m.price.is_synthetic ? " (synthetic)" : ""}` : "No licensed price"}>{m.price ? odds(m.price.decimal) : ""}</span>}
-            <QualityPill status={m.status} />
+            {m.status === "SIMULATED_DEMO" ? <span className="ml-pill-spacer" /> : <QualityPill status={m.status} />}
             {!locked && <ChevronRight size={18} className="muted" aria-hidden="true" />}
           </>
         );

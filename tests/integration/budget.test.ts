@@ -32,12 +32,13 @@ describe("budget gateway", () => {
   });
 
   it("per-minute window stops at the configured limit", async () => {
-    // 1 call already used this minute; 9 more allowed, then refused
-    const results = await Promise.allSettled(Array.from({ length: 12 }, () => admit(t.env)));
-    const ok = results.filter((r) => r.status === "fulfilled").length;
-    expect(ok).toBeLessThanOrEqual(9);
-    const used = await t.env.DB.prepare("SELECT SUM(used) AS n FROM provider_rate_windows").first<{ n: number }>();
-    expect(used!.n).toBeLessThanOrEqual(10);
+    // Pinned clock (fresh day + minute) so the test can never straddle a real minute boundary.
+    const at = new Date("2030-01-01T10:00:30Z");
+    const results = await Promise.allSettled(Array.from({ length: 12 }, () => admit(t.env, "normal", at)));
+    expect(results.filter((r) => r.status === "fulfilled").length).toBe(10);
+    expect(results.filter((r) => r.status === "rejected").every((r) => (r as PromiseRejectedResult).reason.code === "RATE_LIMITED")).toBe(true);
+    const used = await t.env.DB.prepare("SELECT used FROM provider_rate_windows WHERE minute_bucket = ?").bind("2030-01-01T10:00").first<{ used: number }>();
+    expect(used!.used).toBe(10);
   });
 
   it("daily operational budget refuses further calls; reserve priority may use the remainder up to the hard cap", async () => {

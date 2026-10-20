@@ -44,11 +44,11 @@ export function paramsKey(params: Record<string, string | number | undefined>): 
 }
 
 /** Atomically reserve one upstream call. Throws BUDGET_EXHAUSTED / RATE_LIMITED without calling upstream. */
-export async function admit(env: Env, priority: Priority = "normal"): Promise<{ used: number }> {
+export async function admit(env: Env, priority: Priority = "normal", at: Date = new Date()): Promise<{ used: number }> {
   const cfg = budgetConfig(env);
   const limit = priority === "reserve" ? cfg.hardCap : cfg.daily;
-  const day = utcDay();
-  const minute = minuteBucket();
+  const day = utcDay(at);
+  const minute = minuteBucket(at);
   const now = nowIso();
   const q = await env.DB.prepare("SELECT used, provider_reported_remaining FROM provider_quota WHERE provider = ? AND utc_day = ?").bind(PROVIDER, day).first<{ used: number; provider_reported_remaining: number | null }>();
   if (q?.provider_reported_remaining != null && q.provider_reported_remaining <= (priority === "reserve" ? 0 : cfg.reserve)) {

@@ -21,7 +21,7 @@ function DataModeBanner() {
   return (
     <div className="mode-banner" role="note">
       <div className="container mode-banner-inner">
-        <strong>Demo mode:</strong>&nbsp;all teams, fixtures, statistics, prices and probabilities shown are <strong>synthetic</strong> and fictional. No live sports data is connected yet.
+        <span className="mode-dot" aria-hidden="true" /><strong>Demo mode</strong>&nbsp;· all teams, matches, prices and probabilities are fictional.
       </div>
     </div>
   );
@@ -80,9 +80,9 @@ export function Layout() {
               </>
             ) : (
               <>
-                <Link to="/login" className="btn btn-outline-light nav-login only-desktop">Login</Link>
-                <Link to="/join" className="btn btn-primary nav-cta only-desktop">Get Started</Link>
-                <Link to="/login" className="btn btn-outline-light btn-sm only-mobile">Login</Link>
+                <Link to="/login" className="btn btn-outline-light nav-login only-desktop">Log in</Link>
+                <Link to="/join" className="btn btn-primary nav-cta only-desktop">Get started</Link>
+                <Link to="/login" className="btn btn-outline-light btn-sm only-mobile">Log in</Link>
               </>
             )}
             <button className="icon-btn nav-burger" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}>
@@ -113,8 +113,8 @@ export function Layout() {
             </>
           ) : (
             <>
-              <Link to="/join" className="btn btn-primary btn-block">Get Started (beta invite)</Link>
-              <Link to="/login" className="btn btn-outline-light btn-block">Login</Link>
+              <Link to="/join" className="btn btn-primary btn-block">Get started (beta invite)</Link>
+              <Link to="/login" className="btn btn-outline-light btn-block">Log in</Link>
             </>
           )}
         </div>

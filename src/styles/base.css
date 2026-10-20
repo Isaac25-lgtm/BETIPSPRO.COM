@@ -46,9 +46,9 @@ table.sr-only { display: block; }
 .card-pad { padding: 20px; }
 .section { padding: 56px 0; }
 .section-tight { padding: 32px 0; }
-.eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
-.h-section { font-size: clamp(24px, 3vw, 32px); font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
-.h-card { font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
+.h-section { font-size: clamp(24px, 3vw, 32px); font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.h-card { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
 .lede { color: var(--muted); font-size: 16px; max-width: 70ch; }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
@@ -110,3 +110,20 @@ table.sr-only { display: block; }
 
 /* Chart tooltip */
 .tip { position: fixed; z-index: 80; pointer-events: none; background: var(--navy-950); color: #fff; font-size: 12px; padding: 7px 9px; border-radius: 8px; box-shadow: var(--shadow-pop); max-width: 260px; line-height: 1.35; transform: translate(-50%, calc(-100% - 10px)); }
+
+/* ================================================================ design pass 2: calmer system */
+h1, h2, h3, .h-section, .h-card, .page-head h1, .prose h1, .prose h2 { font-family: var(--font-display); }
+.h-section { font-weight: 700; letter-spacing: -.022em; }
+.h-card { font-weight: 650; letter-spacing: -.012em; }
+.page-head h1, .prose h1 { font-weight: 700; letter-spacing: -.025em; }
+.btn { font-weight: 600; border-radius: 10px; }
+.btn-primary { box-shadow: none; }
+.btn-primary:hover:not(:disabled) { transform: none; background: #3bfba4; }
+.btn-primary:active:not(:disabled) { background: #10dd7c; }
+.eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: .1em; }
+/* Labels: quiet, no borders */
+.pill { font-weight: 600; min-height: 22px; padding: 2px 9px; font-size: 11.5px; }
+.pill-demo { background: #fdf3dc; color: #7a4f00; border: 0; }
+.pill-demo-dark { background: rgba(245, 184, 61, .12); color: #f3cd7b; border: 0; }
+.pill-green { background: #e3f6ec; color: #0b6b3a; }
+.card { box-shadow: 0 1px 2px rgba(1, 20, 35, .04), 0 4px 16px rgba(1, 20, 35, .05); }

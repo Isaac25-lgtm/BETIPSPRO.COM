@@ -39,6 +39,9 @@ export default function Home() {
 
 function Hero() {
   const { config } = useAuth();
+  const board = useTodayBoard();
+  const today = board.data?.items.filter((f) => f.featured).length;
+  const sample = board.data?.items.find((f) => f.is_public_sample);
   return (
     <section className="hero" aria-labelledby="hero-title">
       <picture className={`hero-art ${LOCAL_REFERENCE_HERO ? "hero-art-local" : ""}`}>
@@ -58,45 +61,43 @@ function Hero() {
       <div className="container hero-inner">
         <div className="hero-copy">
           {config?.data_mode === "DEMO" && (
-            <div className="hero-demo">
-              <DemoPill dark label="Demo mode: synthetic data, not live football" />
-            </div>
+            <p className="hero-eyebrow">
+              <span className="hero-eyebrow-dot" aria-hidden="true" />
+              Demo build · fictional teams and data
+            </p>
           )}
           <h1 id="hero-title" className="hero-title">
-            Smarter Match Insights
+            Smarter match insights
             <br />
-            for <span className="hl">Informed Choices</span>
+            for <span className="hl">informed choices</span>
           </h1>
           <p className="hero-lede">
-            Data-driven football analysis, transparent model probabilities and the real match evidence behind them, all in one place.
+            Model probabilities for every market, with the real match evidence behind each number.
           </p>
-          <Link to="/matches" className="btn btn-primary hero-cta">
-            View Today&apos;s Matches <ArrowRight size={21} strokeWidth={2.6} />
-          </Link>
+          <div className="hero-actions">
+            <Link to="/matches" className="btn btn-primary hero-cta">
+              View today&apos;s matches <ArrowRight size={18} strokeWidth={2.4} />
+            </Link>
+            {sample && (
+              <Link to={`/matches/${encodeURIComponent(sample.id)}`} className="hero-secondary">
+                See a free sample report <ArrowRight size={16} />
+              </Link>
+            )}
+          </div>
         </div>
         <ul className="feature-strip" aria-label="What you get">
-          <li><span className="fs-icon"><BarChart3 size={26} strokeWidth={2.4} /></span><span>Data-Driven<br />Analysis</span></li>
-          <li><span className="fs-icon"><ShieldCheck size={26} strokeWidth={2.2} /></span><span>Evidence-Based<br />Insights</span></li>
-          <li><span className="fs-icon"><Trophy size={26} strokeWidth={2.2} /></span><span>Major Leagues<br />&amp; Markets</span></li>
-          <li><span className="fs-icon"><FileText size={26} strokeWidth={2.2} /></span><span>Full Match<br />Reports</span></li>
+          <li><span className="fs-icon"><BarChart3 size={20} strokeWidth={2} /></span><span><strong>Model probabilities</strong><small>50+ markets per match</small></span></li>
+          <li><span className="fs-icon"><ShieldCheck size={20} strokeWidth={2} /></span><span><strong>Real match evidence</strong><small>Every number is traceable</small></span></li>
+          <li><span className="fs-icon"><Trophy size={20} strokeWidth={2} /></span><span><strong>League hubs</strong><small>Tables, form and fixtures</small></span></li>
+          <li><span className="fs-icon"><FileText size={20} strokeWidth={2} /></span><span><strong>Full match reports</strong><small>One credit unlocks it all</small></span></li>
         </ul>
+        <dl className="hero-stats" aria-label="At a glance">
+          <div><dt>Markets per match</dt><dd className="num">56</dd></div>
+          <div><dt>Matches today</dt><dd className="num">{today ?? "–"}</dd></div>
+          <div><dt>Free beta reports</dt><dd className="num">{config?.beta_initial_credits ?? 10}</dd></div>
+        </dl>
       </div>
     </section>
-  );
-}
-
-function Flame() {
-  return (
-    <svg width="30" height="32" viewBox="0 0 24 26" aria-hidden="true">
-      <defs>
-        <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ff9a1f" />
-          <stop offset="1" stopColor="#e3201b" />
-        </linearGradient>
-      </defs>
-      <path d="M12.6 1c.6 3.7-1.2 5.9-3 8C7.8 11 6 13 6 16.2 6 20.2 9 23 12.5 23S19 20.4 19 16.6c0-2.4-1-4.3-2.4-5.9-.2 1.7-.9 3-2.2 3.8.5-4.6-.4-9.4-1.8-13.5Z" fill="url(#flame)" />
-      <path d="M12.4 13.2c.3 1.8-.6 2.8-1.4 3.7-.7.8-1.3 1.5-1.3 2.7 0 1.6 1.2 2.7 2.7 2.7s2.8-1.1 2.8-2.8c0-1.6-1-2.8-2.8-6.3Z" fill="#ffd25c" />
-    </svg>
   );
 }
 
@@ -111,12 +112,14 @@ function MatchInsightsCard() {
   return (
     <section className="card insights" aria-labelledby="insights-title">
       <header className="insights-head">
-        <Flame />
-        <h2 id="insights-title">Today&apos;s Match Insights</h2>
-        {anyDemo && <DemoPill label="Synthetic" />}
-        <span className="spacer" />
-        <span className="date-pill"><CalendarDays size={17} aria-hidden="true" /> {longDate(new Date().toISOString())}</span>
-        <Link to="/matches" className="link view-all">View All <ArrowRight size={17} /></Link>
+        <div className="ih-title">
+          <h2 id="insights-title">Today&apos;s match insights</h2>
+          <p className="ih-meta">
+            <CalendarDays size={14} aria-hidden="true" /> {longDate(new Date().toISOString())}
+            {anyDemo && <span className="ih-tag">Synthetic data</span>}
+          </p>
+        </div>
+        <Link to="/matches" className="link view-all">View all <ArrowRight size={16} /></Link>
       </header>
       {error ? (
         <ErrorState message={error.message} onRetry={reload} />
@@ -131,9 +134,9 @@ function MatchInsightsCard() {
               <thead>
                 <tr>
                   <th scope="col">Match</th>
-                  <th scope="col" title="The market where the model differs most from the league's historical base rate. Not a recommendation.">Featured Market</th>
+                  <th scope="col" title="The market where the model differs most from the league's historical base rate. Not a recommendation.">Featured market</th>
                   <th scope="col">Odds</th>
-                  <th scope="col">Model Probability</th>
+                  <th scope="col">Model probability</th>
                   <th scope="col">League</th>
                   <th scope="col">Time</th>
                 </tr>
@@ -232,9 +235,9 @@ function InsightCard({ f }: { f: FixtureSummary }) {
 }
 
 const LEAGUES = [
-  { id: "apif:39", title: "Premier League Hub", text: "Evidence and model probabilities for EPL matches.", cta: "View EPL Hub", img: "/images/league-premier.webp", Icon: Crown },
-  { id: "apif:140", title: "La Liga Hub", text: "Transparent research on Spain's top-flight matches.", cta: "View La Liga Hub", img: "/images/league-liga.webp", Icon: Layers },
-  { id: "apif:2", title: "Champions League Hub", text: "Europe's elite club competition, match by match.", cta: "View UCL Hub", img: "/images/league-continental.webp", Icon: Trophy },
+  { id: "apif:39", title: "Premier League hub", text: "Evidence and model probabilities for EPL matches.", cta: "View EPL hub", img: "/images/league-premier.webp", Icon: Crown },
+  { id: "apif:140", title: "La Liga hub", text: "Transparent research on Spain's top-flight matches.", cta: "View La Liga hub", img: "/images/league-liga.webp", Icon: Layers },
+  { id: "apif:2", title: "Champions League hub", text: "Europe's elite club competition, match by match.", cta: "View UCL hub", img: "/images/league-continental.webp", Icon: Trophy },
 ];
 
 function LeagueTiles() {
@@ -267,18 +270,18 @@ function PremiumCard() {
   return (
     <section className="premium" aria-labelledby="premium-title">
       <div className="premium-head">
-        <span className="crown"><Crown size={26} fill="#f6b51e" color="#f6b51e" /></span>
-        <h2 id="premium-title">Full Match Reports<br />for Serious Analysts</h2>
+        <p className="premium-eyebrow">Beta access</p>
+        <h2 id="premium-title">Full match reports<br />for serious analysts</h2>
       </div>
       <ul className="premium-list">
         {["Every supported market for the match", "Evidence tables from prior fixtures", "Model uncertainty, not false certainty", "Price comparison where licensed", "No ads, distraction-free"].map((t) => (
-          <li key={t}><Check size={18} strokeWidth={3} /> {t}</li>
+          <li key={t}><Check size={16} strokeWidth={2.6} /> {t}</li>
         ))}
       </ul>
       {signedIn ? (
-        <Link to="/matches" className="btn btn-primary premium-cta">Unlock a Report <ArrowRight size={20} /></Link>
+        <Link to="/matches" className="btn btn-primary premium-cta">Unlock a report <ArrowRight size={18} /></Link>
       ) : (
-        <Link to="/join" className="btn btn-primary premium-cta">Join the Beta <ArrowRight size={20} /></Link>
+        <Link to="/join" className="btn btn-primary premium-cta">Join the beta <ArrowRight size={18} /></Link>
       )}
       <p className="premium-foot">{config?.payments_enabled ? "" : `Invite-only beta: ${config?.beta_initial_credits ?? 10} free report credits. No payments taken.`}</p>
     </section>
@@ -291,16 +294,14 @@ function PerformanceCard() {
   return (
     <section className="card perf" aria-labelledby="perf-title">
       <div className="perf-head">
-        <BarChart3 size={34} color="#02ac4f" strokeWidth={3} aria-hidden="true" />
-        <div>
-          <h2 id="perf-title">Our Research Performance</h2>
-          <p>Verified live record only</p>
-        </div>
+        <p className="perf-eyebrow">Track record</p>
+        <h2 id="perf-title">Our research performance</h2>
+        <p>Only verified, pre-kick-off forecasts count.</p>
       </div>
       <div className="perf-kpis">
-        <div><strong className="num">{verified}</strong><span>Verified Live Forecasts</span></div>
-        <div><strong className="kpi-word">Pending</strong><span>Real-Data Backtest</span></div>
-        <div><strong className="kpi-word">In review</strong><span>Calibration</span></div>
+        <div><strong className="num">{verified}</strong><span>Verified live forecasts</span></div>
+        <div><strong className="kpi-status"><i className="dot dot-amber" />Pending</strong><span>Real-data backtest</span></div>
+        <div><strong className="kpi-status"><i className="dot dot-blue" />In review</strong><span>Calibration</span></div>
       </div>
       <Link to="/statistics" className="perf-link">How we measure accuracy <ChevronRight size={15} /></Link>
     </section>
@@ -344,9 +345,9 @@ function ReportShowcase() {
           {sample && r ? (
             <>
               <div className="rp-head">
-                <span className="rp-team"><TeamBadge team={sample.home} size={34} /> {teamLabel(sample.home, 14)}</span>
+                <span className="rp-team"><TeamBadge team={sample.home} size={34} /> {teamLabel(sample.home, 12)}</span>
                 <span className="rp-time num">{kickoffTime(sample.starts_at_utc)}</span>
-                <span className="rp-team rp-away">{teamLabel(sample.away, 14)} <TeamBadge team={sample.away} size={34} /></span>
+                <span className="rp-team rp-away">{teamLabel(sample.away, 12)} <TeamBadge team={sample.away} size={34} /></span>
               </div>
               <div className="rp-1x2">
                 {(["MATCH_RESULT_HOME_REGULATION", "MATCH_RESULT_DRAW_REGULATION", "MATCH_RESULT_AWAY_REGULATION"] as const).map((id, i) => (
@@ -429,7 +430,7 @@ function BetaBand() {
           <strong>Join the invite-only beta</strong>
           <span>{config?.beta_initial_credits ?? 10} free full match reports. No card, no payment.</span>
         </div>
-        <Link to="/join" className="btn btn-primary">Get Started <ArrowRight size={18} /></Link>
+        <Link to="/join" className="btn btn-primary">Get started <ArrowRight size={18} /></Link>
       </div>
     </section>
   );

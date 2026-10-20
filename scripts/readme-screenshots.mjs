@@ -3,7 +3,7 @@
 import { chromium } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 
-const base = process.argv[2] ?? "http://localhost:5173";
+const base = process.argv[2] ?? "http://127.0.0.1:5173";
 const out = "docs/screenshots";
 mkdirSync(out, { recursive: true });
 const b = await chromium.launch();

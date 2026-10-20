@@ -26,12 +26,12 @@ test("full beta walkthrough", async ({ page, request }) => {
 
   // Homepage reproduces the reference structure and labels demo data.
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Smarter Match Insights/ })).toBeVisible();
-  await expect(page.getByText("Demo mode: synthetic data, not live football")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Today's Match Insights" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Smarter match insights/i })).toBeVisible();
+  await expect(page.getByText(/Demo build · fictional teams and data/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Today's match insights/i })).toBeVisible();
   await expect(page.locator(".insight-row")).toHaveCount(5);
-  await expect(page.getByRole("heading", { name: /Full Match Reports/ })).toBeVisible();
-  await expect(page.getByText("Verified Live Forecasts")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Full match reports/i })).toBeVisible();
+  await expect(page.getByText(/Verified live forecasts/i)).toBeVisible();
 
   // Accept the invitation through the real UI.
   await page.goto(`/join?email=${encodeURIComponent(TESTER.email)}`);
@@ -47,7 +47,7 @@ test("full beta walkthrough", async ({ page, request }) => {
   await page.goto("/");
   const rows = page.locator(".insight-row a.match-cell");
   await rows.nth(1).click();
-  await expect(page.getByText("SYNTHETIC DEMO DATA: NOT A REAL FORECAST.")).toBeVisible();
+  await expect(page.locator(".mode-banner")).toContainText("fictional");
   await expect(page.getByRole("heading", { name: "Unlock the full match report" })).toBeVisible();
   await page.getByRole("tab", { name: /Markets/ }).click();
   await expect(page.locator(".market-row.locked").first()).toBeVisible();
@@ -55,7 +55,7 @@ test("full beta walkthrough", async ({ page, request }) => {
 
   // Unlock exactly once.
   await page.getByRole("button", { name: /Unlock report/ }).click();
-  await expect(page.getByText(/1 credit used, 9 left/)).toBeVisible();
+  await expect(page.locator(".unlock-note")).toContainText("1 credit used, 9 left");
   await expect(page.getByRole("heading", { name: "All markets" })).toBeVisible();
 
   // Evidence page with traceable rows.

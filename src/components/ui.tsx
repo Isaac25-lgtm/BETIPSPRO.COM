@@ -72,15 +72,11 @@ function isLight(hex: string) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 186;
 }
 
-/** Neutral competition marker: initials tile (no league emblems are used). */
-export function CompMark({ name, synthetic }: { name: string; synthetic?: boolean }) {
-  const palette = ["#3d195b", "#e2231a", "#0e4a8f", "#1b7d3b", "#b45309", "#0f766e"];
-  let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+/** Neutral competition marker: quiet initials tile (no league emblems are used). */
+export function CompMark({ name }: { name: string; synthetic?: boolean }) {
   return (
-    <span className="comp-mark" style={{ background: palette[h % palette.length] }} aria-hidden="true">
+    <span className="comp-mark" aria-hidden="true">
       {initials(name.replace(/^Demo\s+/, ""))}
-      {synthetic && <span className="comp-mark-dot" />}
     </span>
   );
 }

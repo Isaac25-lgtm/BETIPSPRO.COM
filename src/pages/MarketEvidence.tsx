@@ -46,7 +46,6 @@ export default function MarketEvidence() {
         <QualityPill status={f.status} />
       </header>
       </div>
-      {e.display_notice && <Notice tone="demo"><strong>{e.display_notice}.</strong> All matches, teams and figures below are fictional.</Notice>}
 
       {siblings.length > 1 && (
         <div className="sibling-markets" role="navigation" aria-label="Other markets in this category">

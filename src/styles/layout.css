@@ -4,7 +4,7 @@
 .nav-logo { flex: none; display: flex; align-items: center; }
 .logo { display: inline-flex; align-items: center; gap: 13px; }
 .logo-text { display: grid; line-height: 1; }
-.logo-word { font-size: 30px; font-weight: 800; letter-spacing: -.025em; color: #fff; }
+.logo-word { font-size: 30px; font-weight: 700; letter-spacing: -.025em; color: #fff; }
 .logo-light .logo-word { color: var(--navy-950); }
 .logo-accent { color: var(--accent); }
 .logo-light .logo-accent { color: var(--accent-ink); }
@@ -21,7 +21,7 @@
 .nav-login { min-width: 84px; font-weight: 500; font-size: 17px; }
 .nav-cta { min-width: 124px; font-size: 16px; }
 .nav-credits { color: #cfe0ee; font-size: 14px; padding: 0 6px; }
-.nav-credits .num { color: var(--accent); font-weight: 800; font-size: 16px; }
+.nav-credits .num { color: var(--accent); font-weight: 700; font-size: 16px; }
 .nav-burger { display: none; }
 .only-mobile { display: none !important; }
 @media (max-width: 1360px) { .nav-link { padding: 0 9px; font-size: 15px; } .logo-tag { display: none; } }
@@ -74,7 +74,7 @@
 
 /* ---------------------------------------------------------------- shared atoms */
 .team-badge { display: inline-flex; flex: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.12)); }
-.comp-mark { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .02em; flex: none; }
+.comp-mark { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .02em; flex: none; }
 .comp-mark-dot { position: absolute; right: -3px; top: -3px; width: 9px; height: 9px; border-radius: 50%; background: #ffc53d; border: 2px solid #fff; }
 .prob-bar { position: relative; display: inline-block; height: 8px; border-radius: 6px; background: #e6ecf1; overflow: hidden; flex: none; }
 .prob-fill { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: linear-gradient(90deg, #08c46b, #18e48a); }
@@ -86,7 +86,7 @@
 .error-state > div { flex: 1; }
 .empty-state { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 36px 16px; color: var(--text-2); }
 .page-head { padding: 28px 0 18px; }
-.page-head h1 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 800; letter-spacing: -.025em; line-height: 1.1; }
+.page-head h1 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 700; letter-spacing: -.025em; line-height: 1.1; }
 .page-head p { margin-top: 8px; }
 .breadcrumbs { display: flex; gap: 6px; font-size: 13px; color: var(--muted); margin-bottom: 8px; flex-wrap: wrap; }
 .breadcrumbs a:hover { color: var(--text); text-decoration: underline; }
@@ -100,3 +100,17 @@
 
 @media (max-width: 600px) { .mode-banner { font-size: 12px; line-height: 1.4; } .mode-banner-inner { padding-top: 6px; padding-bottom: 6px; } }
 .date-scroller { position: relative; }
+
+/* design pass 2 */
+.comp-mark { width: 24px; height: 24px; border-radius: 6px; background: #eef2f6; color: #475569; font-size: 9.5px; font-weight: 700; letter-spacing: .02em; }
+.logo-word { font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; }
+.nav-link { font-weight: 500; }
+.nav-link.active { font-weight: 600; }
+.nav-link.active::after { height: 2px; bottom: 14px; }
+.mode-banner { background: #fdf6e3; border-bottom-color: #f1e2b8; }
+
+.mode-banner-inner { display: flex; align-items: center; gap: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mode-dot { width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: #f5b83d; flex: none; }
+@media (max-width: 600px) { .mode-banner-inner { white-space: normal; } }
+
+@media (max-width: 600px) { .mode-banner-inner { display: block; } .mode-dot { display: inline-block; vertical-align: 1px; } }

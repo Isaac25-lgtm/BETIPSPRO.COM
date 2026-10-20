@@ -5,7 +5,7 @@ import { useAuth } from "../app/auth";
 import { useApi } from "../lib/api";
 import { addDays, eatYmd, kickoffDate, kickoffTime, pct, statusLabel, ymdLabel } from "../lib/format";
 import type { FixtureList, FixtureSummary } from "../lib/types";
-import { CompMark, DemoPill, EmptyState, ErrorState, ProbBar, Skeleton, TeamBadge, teamLabel } from "../components/ui";
+import { CompMark, EmptyState, ErrorState, ProbBar, Skeleton, TeamBadge, teamLabel } from "../components/ui";
 
 function useUnlockedSet() {
   const { me } = useAuth();
@@ -126,8 +126,7 @@ export default function Matches() {
               <header className="fg-head">
                 <CompMark name={g.comp.name} synthetic={g.comp.is_synthetic} />
                 <Link to={`/leagues/${encodeURIComponent(g.comp.id)}`} className="fg-title">{g.comp.name}</Link>
-                <span className="muted small">{g.comp.country}</span>
-                {g.comp.is_synthetic && <DemoPill />}
+                {!g.comp.is_synthetic && <span className="muted small">{g.comp.country}</span>}
                 <span className="spacer" />
                 <span className="muted small">{g.items.length} match{g.items.length === 1 ? "" : "es"}</span>
               </header>

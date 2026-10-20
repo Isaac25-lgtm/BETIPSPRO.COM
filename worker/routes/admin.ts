@@ -17,6 +17,7 @@ import { aiStatus, generateSummary } from "../services/ai/gemini.ts";
 import { marketEvidence } from "../services/evidence.ts";
 import { allowedNumbers, validateSummary } from "../services/ai/validate.ts";
 import { settlePreKickoff } from "../services/settlement.ts";
+import { refreshOdds } from "../services/sports/odds.ts";
 
 export const adminRoutes = new Hono<AppBindings>();
 adminRoutes.use("*", adminOnly);
@@ -337,6 +338,13 @@ adminRoutes.post("/ai/import", async (c) => {
   bumpCacheGeneration();
   await audit(c, "ai.import", "ai_explanations", null, { rows: b.rows.length, written, cost_usd: b.rows.reduce((s, r) => s + r.cost_usd, 0) });
   return ok(c, { received: b.rows.length, written, rejected_by_server: rejected });
+});
+
+/** Bookmaker prices from The Odds API for upcoming fixtures (metered; ~12 credits per refresh). */
+adminRoutes.post("/odds/refresh", async (c) => {
+  const r = await refreshOdds(c.env, { jobId: newId("job") });
+  await audit(c, "odds.refresh", "bookmaker_snapshots", null, r);
+  return ok(c, r);
 });
 
 /** R-14: record outcomes for finished matches' pre-kickoff forecasts (append-only fields). */

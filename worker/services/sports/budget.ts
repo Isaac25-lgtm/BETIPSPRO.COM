@@ -22,7 +22,7 @@ import { ApiError } from "../../lib/http.ts";
 import { newId, sha256Hex } from "../../lib/crypto.ts";
 import { minuteBucket, nowIso, utcDay } from "../../lib/time.ts";
 
-export type ProviderName = "api_football" | "football_data_org";
+export type ProviderName = "api_football" | "football_data_org" | "the_odds_api";
 export const PROVIDER: ProviderName = "api_football";
 const TIMEOUT_MS = 10_000;
 
@@ -40,6 +40,9 @@ interface ProviderSpec {
   baseUrl: string;
   key: (env: Env) => string | undefined;
   authHeader: string;
+  /** Some providers take the key as a query parameter. It is added only to the outgoing URL, never to the cache key,
+   * stored snapshots or usage logs. */
+  authQuery?: string;
   limits: (env: Env) => { daily: number; hardCap: number; perMinute: number };
   /** Returns an error message when the body signals a provider-level error, else null. */
   bodyError: (body: unknown) => string | null;
@@ -98,6 +101,30 @@ export const PROVIDERS: Record<ProviderName, ProviderSpec> = {
       remaining: null,
       minuteRemaining: numOrNull(h.get("x-requests-available-minute")),
       resetSec: numOrNull(h.get("x-requestcounter-reset")),
+    }),
+  },
+  /** The Odds API: one credit per market per region per call. 6 leagues x 2 markets x 1 region daily ~= 360 of the
+   * free plan's 500 monthly credits. The provider's remaining-credit header stops calls before the plan runs out. */
+  the_odds_api: {
+    label: "The Odds API",
+    baseUrl: "https://api.the-odds-api.com/v4",
+    key: (env) => env.ODDS_API_KEY,
+    authHeader: "x-api-key",
+    authQuery: "apiKey",
+    limits: (env) => {
+      const hardCap = num(env.ODDS_DAILY_HARD_CAP, 30);
+      return { hardCap, daily: Math.min(num(env.ODDS_DAILY_BUDGET, 8), hardCap), perMinute: 10 };
+    },
+    isValidBody: (b) => Array.isArray(b),
+    bodyError: (b) => {
+      const o = b as { message?: unknown; error_code?: unknown };
+      return o && !Array.isArray(o) && (o.message != null || o.error_code != null) ? String(o.message ?? o.error_code) : null;
+    },
+    captureHeaders: (h) => ({
+      limit: null,
+      remaining: numOrNull(h.get("x-requests-remaining")),
+      minuteRemaining: null,
+      resetSec: null,
     }),
   },
 };
@@ -200,8 +227,9 @@ export async function meteredGet<T = unknown>(
       let status = "ok";
       let httpStatus: number | null = null;
       try {
-        const url = `${spec.baseUrl}${endpoint}${pkey ? `?${pkey}` : ""}`;
-        const res = await doFetch(url, { headers: { [spec.authHeader]: key }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+        const qs = [pkey, spec.authQuery ? `${spec.authQuery}=${encodeURIComponent(key)}` : ""].filter(Boolean).join("&");
+        const url = `${spec.baseUrl}${endpoint}${qs ? `?${qs}` : ""}`;
+        const res = await doFetch(url, { headers: spec.authQuery ? {} : { [spec.authHeader]: key }, signal: AbortSignal.timeout(TIMEOUT_MS) });
         httpStatus = res.status;
         const hdr = spec.captureHeaders(res.headers);
         await captureQuotaHeaders(env, provider, hdr);

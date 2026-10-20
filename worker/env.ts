@@ -33,6 +33,10 @@ export interface Env {
   GIT_COMMIT?: string;
   // Ask BetTipsPro AI (DeepSeek); key is a secret, never logged
   DEEPSEEK_API_KEY?: string;
+  // The Odds API (bookmaker prices); secret
+  ODDS_API_KEY?: string;
+  ODDS_DAILY_BUDGET?: string;
+  ODDS_DAILY_HARD_CAP?: string;
   ASSISTANT_ENABLED?: string;
   ASSISTANT_DAILY_LIMIT?: string;
   ASSISTANT_DAILY_BUDGET_USD?: string;

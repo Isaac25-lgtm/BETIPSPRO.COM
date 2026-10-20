@@ -156,7 +156,7 @@ function DataRights() {
         <li><strong>API-Football (API-SPORTS):</strong> football data when enabled. Their subscription does not by itself grant rights to publish all data, logos or images commercially, and betting-related use may need permission from rights holders. Public monetisation is blocked until this is reviewed.</li>
         <li><strong>Logos and imagery:</strong> we show no club crests, competition emblems or player photos. Team marks are generated monograms. Hero and card artwork is original procedural art.</li>
         <li><strong>Competition names</strong> are used descriptively only, and imply no endorsement.</li>
-        <li><strong>Bookmaker prices:</strong> shown only when our licensed provider supplies them, with bookmaker name and timestamp. No scraping.</li>
+        <li><strong>Bookmaker prices:</strong> from The Odds API (European bookmakers), shown with the bookmaker's name and update time, refreshed daily. No scraping. Check the provider's terms before commercial use.</li>
       </ul>
     </article>
   );

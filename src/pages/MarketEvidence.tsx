@@ -116,9 +116,10 @@ export default function MarketEvidence() {
 
           <section className="card card-pad">
             <h2 className="h-card">Price panel</h2>
+            {e.prices.length > 6 && <p className="tiny muted">Best 6 of {e.prices.filter((pr) => pr.decimal != null).length} bookmaker prices.</p>}
             {e.prices.length === 0 ? (
               <p className="muted small">No price for this market.</p>
-            ) : e.prices.map((pr) => (
+            ) : [...e.prices].filter((pr) => pr.decimal != null).sort((x, y) => (y.decimal ?? 0) - (x.decimal ?? 0)).slice(0, 6).map((pr) => (
               <div key={pr.bookmaker} className="price-box">
                 <div className="row" style={{ justifyContent: "space-between" }}>
                   <strong>{pr.bookmaker}</strong>

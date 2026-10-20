@@ -97,7 +97,7 @@ const TOOLS = [
 
 const SYSTEM = `You are "Ask BetTipsPro AI", the research assistant on BetTipsPro, a football match-analysis site.
 Answer ONLY with figures returned by your tools in this conversation turn. Never invent matches, probabilities, odds, records, injuries, line-ups or news; if a tool returns nothing, say so plainly. Copy numbers exactly as the tools give them.
-Probabilities are the site's model estimates; each tool row says its period ("full time (90 minutes)" or "first half"). Fair odds are 1/probability, not bookmaker prices.
+Probabilities are the site's model estimates; each tool row says its period ("full time (90 minutes)" or "first half"). Fair odds are 1/probability. When a row has best_bookmaker_odds, also show it as "best price X (Bookmaker)": that is a real bookmaker quote.
 Kickoff times from tools are UTC; present them in East Africa Time (UTC+3), e.g. "Tue 22:00".
 Format: one short intro line, then a numbered list, one line per item: **Home vs Away** - market - probability (fair odds) - kickoff, with a link [Open match](/matches/<fixture_id>) using only fixture_id values from the tools. No tables. Keep answers under 200 words.
 Be direct and useful. No disclaimers or lectures. Never use the words "guaranteed", "sure", "lock", "banker" or "risk-free".
@@ -198,14 +198,33 @@ async function findMarkets(env: Env, a: Record<string, unknown>) {
       WHERE ${where.join(" AND ")} ORDER BY fo.probability DESC LIMIT 300`,
   ).bind(...b).all<{ fixture_id: string; m: string; p: number; asof: string; mv: string; ko: string; comp: string; home: string; away: string }>();
   const seen = new Set<string>();
-  const out = [];
+  const out: Array<Record<string, unknown>> = [];
   for (const r of rows.results) {
     if (onePer && seen.has(r.fixture_id)) continue;
     seen.add(r.fixture_id);
-    out.push({ fixture_id: r.fixture_id, match: `${r.home} vs ${r.away}`, competition: r.comp, kickoff_utc: r.ko, market: marketById.get(r.m)?.label ?? r.m, period: period(r.m), probability_pct: pct1(r.p), fair_odds: odds2(r.p), data_as_of: r.asof, model_version: r.mv });
+    out.push({ fixture_id: r.fixture_id, match: `${r.home} vs ${r.away}`, competition: r.comp, kickoff_utc: r.ko, market: marketById.get(r.m)?.label ?? r.m, market_id: r.m, period: period(r.m), probability_pct: pct1(r.p), fair_odds: odds2(r.p), data_as_of: r.asof, model_version: r.mv });
     if (out.length >= limit) break;
   }
+  await attachBestPrices(env, out);
   return { count: out.length, synthetic_demo_data: sc.synthetic, filters: { min_probability: min, max_probability: max, market_group: a.market_group ?? "popular", days_ahead: days }, results: out };
+}
+
+/** Best current bookmaker price (latest update, real prices only) for each row's market. */
+async function attachBestPrices(env: Env, rows: Array<Record<string, unknown>>) {
+  if (!rows.length) return;
+  const keys = JSON.stringify(rows.map((r) => [r.fixture_id, r.market_id]));
+  const res = await env.DB.prepare(
+    `SELECT b.fixture_id, b.market_definition_id AS m, b.odds_decimal AS d, b.bookmaker_name AS bk, b.collected_at AS at FROM bookmaker_snapshots b
+       JOIN json_each(?1) j ON b.fixture_id = json_extract(j.value, '$[0]') AND b.market_definition_id = json_extract(j.value, '$[1]')
+      WHERE b.is_synthetic = 0 AND b.stale_after > ?2
+        AND b.collected_at = (SELECT MAX(collected_at) FROM bookmaker_snapshots x WHERE x.fixture_id = b.fixture_id AND x.market_definition_id = b.market_definition_id)`,
+  ).bind(keys, nowIso()).all<{ fixture_id: string; m: string; d: number; bk: string; at: string }>();
+  const best = new Map<string, { d: number; bk: string; at: string }>();
+  for (const r of res.results) { const k = `${r.fixture_id}|${r.m}`; if (!best.has(k) || best.get(k)!.d < r.d) best.set(k, r); }
+  for (const r of rows) {
+    const b = best.get(`${r.fixture_id}|${r.market_id}`);
+    if (b) { r.best_bookmaker_odds = b.d; r.best_bookmaker = b.bk; r.bookmaker_implied_pct = pct1(1 / b.d); r.odds_updated_at = b.at; }
+  }
 }
 
 async function listMatches(env: Env, a: Record<string, unknown>) {
@@ -349,7 +368,7 @@ export function renderFromTools(calls: Array<{ name: string; result: Record<stri
     if (name === "find_markets") {
       if (!rows.length) { lines.push("No upcoming markets match that request in the site's data."); continue; }
       lines.push("Here is what the site's data shows:");
-      rows.forEach((r, i) => lines.push(`${i + 1}. **${r.match}** - ${r.market}${r.period === "first half" ? " (first half)" : ""} - ${r.probability_pct}% (fair odds ${r.fair_odds}) - ${when(r.kickoff_utc as string)} EAT [Open match](/matches/${r.fixture_id})`));
+      rows.forEach((r, i) => lines.push(`${i + 1}. **${r.match}** - ${r.market}${r.period === "first half" ? " (first half)" : ""} - ${r.probability_pct}% (fair odds ${r.fair_odds})${r.best_bookmaker_odds ? `, best price ${r.best_bookmaker_odds} (${r.best_bookmaker})` : ""} - ${when(r.kickoff_utc as string)} EAT [Open match](/matches/${r.fixture_id})`));
     } else if (name === "list_matches") {
       if (!rows.length) { lines.push("No upcoming matches with reports match that request."); continue; }
       lines.push("Upcoming matches in the site's data:");

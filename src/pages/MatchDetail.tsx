@@ -483,13 +483,13 @@ function OddsSection({ r, fixtureId }: { r: Report; fixtureId: string }) {
       ) : (
         <div className="table-scroll">
           <table className="dtable">
-            <thead><tr><th>Market</th><th>Bookmaker</th><th>Decimal</th><th>Implied (1/odds)</th><th>Model</th><th></th></tr></thead>
+            <thead><tr><th>Market</th><th>Best price</th><th>Bookmaker</th><th>Implied (1/odds)</th><th>Model</th><th></th></tr></thead>
             <tbody>
               {priced.map((m) => (
                 <tr key={m.id}>
                   <td><Link className="link" to={`/matches/${encodeURIComponent(fixtureId)}/markets/${m.id}`}>{m.label}</Link></td>
-                  <td>{m.price!.bookmaker}</td>
-                  <td className="num">{odds(m.price!.decimal)}{m.price!.stale && <span className="pill pill-amber" style={{ marginLeft: 6 }}>stale</span>}</td>
+                  <td className="num"><strong>{odds(m.price!.decimal)}</strong>{m.price!.stale && <span className="pill pill-amber" style={{ marginLeft: 6 }}>stale</span>}</td>
+                  <td>{m.price!.bookmaker}{(m.price!.bookmakers ?? 0) > 1 && <span className="tiny muted"> · best of {m.price!.bookmakers}</span>}</td>
                   <td className="num">{pct(m.price!.implied_probability, 1)}</td>
                   <td className="num">{pct(m.probability, 1)}</td>
                   <td><ChevronRight size={16} className="muted" /></td>

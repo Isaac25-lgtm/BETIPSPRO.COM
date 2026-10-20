@@ -15,7 +15,7 @@ const KEY_MARKETS = [
 ] as const;
 
 export interface OverviewMatch extends Omit<FixtureSummary, "featured"> {
-  featured: null | { market_id: string; label: string; probability: number | null };
+  featured: null | { market_id: string; label: string; probability: number | null; best_odds: null | { decimal: number; bookmaker: string; collected_at: string } };
   probabilities: null | { home: number | null; draw: number | null; away: number | null; over_2_5: number | null; btts: number | null; first_half_goal: number | null; home_range: null | [number, number] };
   markets_priced: number;
   limited_reason: string | null;
@@ -37,6 +37,7 @@ export async function reportOverview(env: Env) {
   const priced = new Map<string, number>();
   const summaries = new Set<string>();
   const featured = new Map<string, number | null>();
+  const bestOdds = new Map<string, { decimal: number; bookmaker: string; collected_at: string }>();
   if (fixtures.length) {
     const latest = `SELECT r.fixture_id, r.report_version FROM match_reports r
                       JOIN fixtures f ON f.id = r.fixture_id
@@ -62,6 +63,14 @@ export async function reportOverview(env: Env) {
       ).bind(now),
     ]);
     for (const r of fe.results) featured.set(r.fixture_id as string, r.p as number | null);
+    const od = await env.DB.prepare(
+      `SELECT b.fixture_id, b.odds_decimal AS d, b.bookmaker_name AS bk, b.collected_at AS at FROM bookmaker_snapshots b
+         JOIN (${latest}) l ON l.fixture_id = b.fixture_id
+         JOIN match_reports r ON r.fixture_id = b.fixture_id AND r.report_version = l.report_version AND r.featured_market_id = b.market_definition_id
+        WHERE b.is_synthetic = 0 AND b.stale_after > ?1
+          AND b.collected_at = (SELECT MAX(collected_at) FROM bookmaker_snapshots x WHERE x.fixture_id = b.fixture_id AND x.market_definition_id = b.market_definition_id)`,
+    ).bind(now).all<{ fixture_id: string; d: number; bk: string; at: string }>();
+    for (const r of od.results) if (!bestOdds.has(r.fixture_id) || bestOdds.get(r.fixture_id)!.decimal < r.d) bestOdds.set(r.fixture_id, { decimal: r.d, bookmaker: r.bk, collected_at: r.at });
     for (const r of fc.results) {
       const id = r.fixture_id as string;
       if (!probs.has(id)) probs.set(id, new Map());
@@ -85,7 +94,7 @@ export async function reportOverview(env: Env) {
     const featuredP = r.featured_market_id ? (m?.get(r.featured_market_id)?.p ?? featured.get(r.id) ?? null) : null;
     return {
       ...toSummary(r),
-      featured: fm ? { market_id: fm.id, label: fm.label, probability: show ? featuredP : null } : null,
+      featured: fm ? { market_id: fm.id, label: fm.label, probability: show ? featuredP : null, best_odds: bestOdds.get(r.id) ?? null } : null,
       probabilities: show
         ? { home: get("MATCH_RESULT_HOME_REGULATION"), draw: get("MATCH_RESULT_DRAW_REGULATION"), away: get("MATCH_RESULT_AWAY_REGULATION"),
             over_2_5: get("TOTAL_GOALS_OVER_2_5_REGULATION"), btts: get("BTTS_YES_REGULATION"), first_half_goal: get("FIRST_HALF_GOALS_OVER_0_5"), home_range: range }

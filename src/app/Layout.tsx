@@ -178,7 +178,7 @@ function Footer() {
       </div>
       <div className="container footer-bottom">
         <span>© {new Date().getFullYear()} {brand.companyOwner}. Beta build: not for public commercial use.</span>
-        <span>Football data provider (when enabled): API-Football. No club or competition logos are used.</span>
+        <span>Fixtures and results: football-data.org. Bookmaker prices: The Odds API.</span>
       </div>
     </footer>
   );

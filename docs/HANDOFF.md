@@ -369,3 +369,4 @@ cd model-pipeline && python -m pip install -e ".[dev]"   # numpy, scipy, pandas,
 - **Code review** by another agent: `docs/reviews/2026-10-20-code-and-model-review.md`.
 
 - **Review fixes (D-031):** see `docs/reviews/2026-10-20-fixes.md` for every finding's status. Assistant answers are verified against tool results; DeepSeek spend is reserved per call (`assistant_spend`, $3/day, $30/month). Settlement runs daily (`POST /admin/settle`).
+- **Bookmaker prices (D-032):** The Odds API, `worker/services/sports/odds.ts`, secret `ODDS_API_KEY`, daily cron + `POST /admin/odds/refresh`. Free plan 500 credits/month; a refresh costs ~12. First comparison shows Champions League model probabilities can be far from the market (e.g. Liverpool 89% vs best price 1.54, about 65%): treat thin-data CL forecasts with care.

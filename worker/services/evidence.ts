@@ -206,7 +206,8 @@ export async function fullReport(env: Env, fixtureId: string) {
 
   const markets = catalog.markets.map((m) => {
     const f = fcById.get(m.id);
-    const ov = oddsView(oddsRows, m).find((o) => o.decimal != null) ?? null;
+    const quotes = oddsView(oddsRows, m).filter((o) => o.decimal != null && !o.stale);
+    const ov = quotes.sort((a, b) => (b.decimal ?? 0) - (a.decimal ?? 0))[0] ?? oddsView(oddsRows, m).find((o) => o.decimal != null) ?? null;
     return {
       id: m.id, label: m.label, short_label: m.short_label, category: m.category, family: m.family, tier: m.tier,
       settlement_period: m.settlement_period,
@@ -216,7 +217,7 @@ export async function fullReport(env: Env, fixtureId: string) {
       uncertainty: f ? JSON.parse(f.uncertainty_json) : null,
       model_version: f?.model_version ?? null,
       generated_at: f?.generated_at ?? null,
-      price: ov ? { bookmaker: ov.bookmaker, decimal: ov.decimal, implied_probability: ov.implied_probability, is_synthetic: ov.is_synthetic, stale: ov.stale } : null,
+      price: ov ? { bookmaker: ov.bookmaker, decimal: ov.decimal, implied_probability: ov.implied_probability, is_synthetic: ov.is_synthetic, stale: ov.stale, bookmakers: quotes.length } : null,
     };
   });
 

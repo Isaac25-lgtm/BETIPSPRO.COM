@@ -165,8 +165,13 @@ export async function attachFeatured(env: Env, rows: FixtureRow[]): Promise<Fixt
       ).bind(keys, nowIso()),
     ]);
     for (const r of fc.results) probs.set(r.fixture_id as string, { probability: r.probability as number | null, status: r.status as string });
+    // Best available price in the most recent update (rows are ordered by collected_at).
     for (const r of od.results) {
-      odds.set(r.fixture_id as string, { decimal: r.odds_decimal as number, bookmaker: r.bookmaker_name as string, is_synthetic: !!r.is_synthetic, collected_at: r.collected_at as string });
+      const prev = odds.get(r.fixture_id as string);
+      const newer = !prev || (r.collected_at as string) > prev.collected_at;
+      if (newer || ((r.collected_at as string) === prev!.collected_at && (r.odds_decimal as number) > prev!.decimal)) {
+        odds.set(r.fixture_id as string, { decimal: r.odds_decimal as number, bookmaker: r.bookmaker_name as string, is_synthetic: !!r.is_synthetic, collected_at: r.collected_at as string });
+      }
     }
   }
   return rows.map((r) => {

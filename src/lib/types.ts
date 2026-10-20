@@ -88,7 +88,7 @@ export interface ReportMarket {
   uncertainty: { p05?: number; p95?: number; method?: string; note?: string } | null;
   model_version: string | null;
   generated_at: string | null;
-  price: null | { bookmaker: string; decimal: number; implied_probability: number; is_synthetic: boolean; stale: boolean };
+  price: null | { bookmaker: string; decimal: number; implied_probability: number; is_synthetic: boolean; stale: boolean; bookmakers?: number };
 }
 
 export interface Report {

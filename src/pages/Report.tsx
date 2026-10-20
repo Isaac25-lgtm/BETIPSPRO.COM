@@ -8,7 +8,7 @@ import type { FixtureSummary } from "../lib/types";
 import { EmptyState, ErrorState, Notice, Skeleton, TeamBadge, teamLabel } from "../components/ui";
 
 interface OverviewMatch extends Omit<FixtureSummary, "featured"> {
-  featured: null | { market_id: string; label: string; probability: number | null };
+  featured: null | { market_id: string; label: string; probability: number | null; best_odds?: null | { decimal: number; bookmaker: string; collected_at: string } };
   probabilities: null | { home: number | null; draw: number | null; away: number | null; over_2_5: number | null; btts: number | null; first_half_goal: number | null; home_range: null | [number, number] };
   markets_priced: number;
   limited_reason: string | null;
@@ -179,6 +179,7 @@ function MatchRow({ m }: { m: OverviewMatch }) {
       <span className={`mr-p mr-p-ht num${strong(p?.first_half_goal)}`}><small>1H</small>{v(p?.first_half_goal)}</span>
       <span className="mr-lean">
         {m.featured ? <>{m.featured.label}{m.featured.probability != null && <> · {pct(m.featured.probability)}</>}</> : <span className="muted">No highlighted market</span>}
+        {m.featured?.best_odds && <small className="mr-odds">Best price <b className="num">{m.featured.best_odds.decimal.toFixed(2)}</b> · {m.featured.best_odds.bookmaker}</small>}
         <small>{m.markets_priced} markets priced{m.has_summary ? " · summary written" : ""}</small>
       </span>
       <ChevronRight size={18} className="mr-go muted" aria-hidden="true" />

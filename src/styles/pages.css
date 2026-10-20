@@ -565,3 +565,6 @@ a.market-row:hover { background: #f6f9fb; }
     linear-gradient(90deg, rgba(0,20,36,.96) 0%, rgba(0,20,36,.85) 50%, rgba(0,20,36,.5) 100%),
     url(/images/local/hero-desktop-1600.webp) 100% 30% / cover no-repeat, #001424;
 }
+
+.mr-lean .mr-odds { color: var(--text-2); font-weight: 600; }
+.mr-lean .mr-odds b { color: var(--navy-950); }

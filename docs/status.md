@@ -65,3 +65,21 @@
 2. Fit on real history, import, review data coverage, select ~10 pilot fixtures.
 3. Staging deployment (after approval) → Core Web Vitals + load matrix on Cloudflare.
 4. Brand decision; legal/data-rights review; then consider OAuth and payments.
+
+
+## Update 2026-10-20: real data connected
+
+- **football-data.org** (free) loaded for Premier League, La Liga, Champions League, Bundesliga, Serie A and Ligue 1, seasons 2025 and 2026: 3,837 real fixtures for 12 requests.
+- **API-Football** (free) connected: plan Free, 100/day. Current season blocked on the free plan (only 2022-2024). 380 Premier League 2024/25 matches loaded for research.
+- **Real-data backtest** (rolling origin over recent rounds, out-of-sample, n=250 matches; 326 for first half):
+
+| Family | Log loss (model / base rate) | Brier (model / base rate) |
+|---|---|---|
+| Match result 1X2 | 0.9564 / 1.0626 | 0.5655 / 0.6433 |
+| Over/Under 2.5 | 0.6523 / 0.6654 | 0.2303 / 0.2365 |
+| BTTS | 0.6790 / 0.6813 | 0.2427 / 0.2441 |
+| First-half over 0.5 | 0.6018 / 0.6111 | 0.2068 / 0.2104 |
+
+  The model beats the base rate on all four, with a small edge on BTTS. This is one sample of 250 matches; it is not yet a validated track record, and nothing has been compared with bookmaker prices.
+- 77 real fixtures in the next 10 days have reports. Corners and cards show Insufficient evidence: the free tier has no such statistics. Champions League newcomers with too few matches are also Insufficient.
+- Demo data is hidden automatically once real reports exist. The free sample report is PSG vs FC Barcelona.

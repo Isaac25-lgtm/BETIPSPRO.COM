@@ -10,7 +10,9 @@ const login = await fetch(`${url}/api/v1/auth/login`, { method: "POST", headers:
 if (!login.ok) throw new Error(`login failed: ${(await login.json()).error?.message}`);
 const cookie = login.headers.get("set-cookie").split(";")[0];
 const jobs = (arg("jobs") ? JSON.parse(arg("jobs")) : [JSON.parse(arg("job", '{"kind":"status","priority":"reserve"}'))]);
-for (const job of jobs) {
+const delayMs = Number(arg("delay-ms", "0"));
+for (const [i, job] of jobs.entries()) {
+  if (i && delayMs) await new Promise((r) => setTimeout(r, delayMs));
   const r = await fetch(`${url}/api/v1/admin/ingest`, { method: "POST", headers: { ...H, cookie }, body: JSON.stringify(job) });
   const b = await r.json();
   console.log(`\n== ${JSON.stringify(job)} -> HTTP ${r.status}`);

@@ -21,6 +21,10 @@ export interface Env {
   ADMIN_BOOTSTRAP_TOKEN?: string;
   SESSION_SECRET?: string;
   API_FOOTBALL_KEY?: string;
+  FOOTBALL_DATA_ORG_KEY?: string;
+  FDO_DAILY_BUDGET?: string;
+  FDO_DAILY_HARD_CAP?: string;
+  FDO_PER_MINUTE_MAX?: string;
   TURNSTILE_SECRET_KEY?: string;
   VERTEX_SERVICE_ACCOUNT_JSON?: string;
   VERTEX_PROJECT_ID?: string;

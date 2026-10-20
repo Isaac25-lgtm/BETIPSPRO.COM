@@ -54,6 +54,7 @@ adminRoutes.get("/overview", async (c) => {
     unlocks: unlocks.results[0],
     feedback: fb.results[0],
     provider: await usageSummary(c.env),
+    providers: { api_football: await usageSummary(c.env, "api_football"), football_data_org: await usageSummary(c.env, "football_data_org") },
     stale_live_fixtures: stale.results[0]?.n ?? 0,
     model_runs: runs.results,
     ai: aiStatus(c.env),
@@ -161,7 +162,8 @@ adminRoutes.get("/jobs", async (c) => {
 adminRoutes.post("/ingest", async (c) => {
   const admin = requireAdmin(c);
   const b = await body(c, z.object({
-    kind: z.enum(["status", "fixtures_by_date", "league_season", "fixture_details", "odds", "team_last"]),
+    kind: z.enum(["status", "fixtures_by_date", "league_season", "fixture_details", "odds", "team_last", "fdo_competition"]),
+    competition: z.string().regex(/^[A-Z0-9]{2,4}$/).optional(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), league: z.string().regex(/^\d+$/).optional(), season: z.string().regex(/^\d{4}$/).optional(),
     team: z.string().regex(/^\d+$/).optional(), last: z.number().int().min(1).max(20).optional(),
     provider_ids: z.array(z.string().regex(/^\d+$/)).max(20).optional(), fixture: z.string().regex(/^\d+$/).optional(),
@@ -173,7 +175,7 @@ adminRoutes.post("/ingest", async (c) => {
 
 adminRoutes.get("/export/history", async (c) => {
   const provider = c.req.query("provider") ?? "api_football";
-  if (!["api_football", "demo"].includes(provider)) throw new ApiError(400, "BAD_REQUEST", "Unknown provider.");
+  if (!["api_football", "football_data_org", "demo"].includes(provider)) throw new ApiError(400, "BAD_REQUEST", "Unknown provider.");
   await audit(c, "export.history", "provider", provider, {});
   return ok(c, await exportHistory(c.env, provider));
 });

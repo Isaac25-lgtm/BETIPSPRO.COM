@@ -343,3 +343,10 @@
 .nav-login { font-size: 15px; font-weight: 500; min-width: 0; padding: 0 18px; }
 .nav-cta { font-size: 15px; min-width: 0; padding: 0 20px; }
 .rp-team { font-size: 14px; }
+
+/* Without licensed odds the odds column is dropped; widen market + probability instead. */
+.insights-table.no-odds .c-market { width: 18%; }
+.insights-table.no-odds .c-prob { width: 18.5%; }
+.time-cell { white-space: nowrap; }
+.insights-table.no-odds .c-time { width: 9.5%; }
+.insights-table.no-odds .c-league { width: 13%; }

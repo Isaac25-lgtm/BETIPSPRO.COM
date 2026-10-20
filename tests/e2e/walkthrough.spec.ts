@@ -28,7 +28,7 @@ test("full beta walkthrough", async ({ page, request }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Smarter match insights/i })).toBeVisible();
   await expect(page.getByText(/Demo build · fictional teams and data/i)).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Today's match insights/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /(Today.s|Upcoming) match insights/i })).toBeVisible();
   await expect(page.locator(".insight-row")).toHaveCount(5);
   await expect(page.getByRole("heading", { name: /Full match reports/i })).toBeVisible();
   await expect(page.getByText(/Verified live forecasts/i)).toBeVisible();

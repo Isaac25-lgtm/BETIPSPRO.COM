@@ -168,9 +168,10 @@ def test_fit_cli_on_worker_export_envelope(tmp_path, world):
 
     fx = [dict(f, is_synthetic=0, provider="api_football") for f in world.fixtures if f["competition_id"] == "demo:dpd"]
     # Mark the upcoming fixtures as future relative to "now" so they are forecast.
+    soon = (datetime.now(timezone.utc) + timedelta(days=3)).strftime("%Y-%m-%dT15:00:00Z")
     for f in fx:
         if f["status"] == "NS":
-            f["starts_at_utc"] = "2099-01-01T15:00:00Z"
+            f["starts_at_utc"] = soon  # inside the CLI's default 10-day forecast horizon
     export = {"ok": True, "data": {"competitions": world.competitions[:1], "teams": [t for t in world.teams if t["competition_id"] == "demo:dpd"],
                                     "referees": world.referees, "fixtures": fx,
                                     "team_stats": [s for s in world.team_stats if s["fixture_id"].startswith("demo:dpd")]}}
@@ -182,3 +183,17 @@ def test_fit_cli_on_worker_export_envelope(tmp_path, world):
     statuses = {f["status"] for f in art["forecasts"]}
     assert "SIMULATED_DEMO" not in statuses and "VERIFIED" in statuses and "PARTIAL" in statuses
     assert art["bookmaker_snapshots"] == []  # never synthesises prices outside demo mode
+
+
+def test_team_without_history_is_insufficient_not_a_crash(world):
+    """Real-data edge case: a newcomer with no matches before the cut-off must yield INSUFFICIENT."""
+    fixtures = [f for f in world.fixtures if f["competition_id"] == "demo:dpd"]
+    template = next(f for f in fixtures if f["status"] == "NS")
+    newcomer = dict(template, id="demo:dpd:new", provider_id="new", away_team_id="demo:dpd:newcomer")
+    ds = Dataset(world.competitions[:1], world.teams, world.referees, fixtures + [newcomer],
+                 [s for s in world.team_stats if s["fixture_id"].startswith("demo:dpd")])
+    df = ds.matches()
+    m = fit_competition(df, pd.Timestamp(ANCHOR + timedelta(hours=6)), CATALOG, with_uncertainty=False)
+    _p, rows = forecast_fixture(m, newcomer, CATALOG, np.random.default_rng(0), demo=False, n_samples=5)
+    goals = next(r for r in rows if r["market_id"] == "TOTAL_GOALS_OVER_2_5_REGULATION")
+    assert goals["probability"] is None and goals["status"] == "INSUFFICIENT"

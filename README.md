@@ -140,6 +140,14 @@ Full status, known limitations and the acceptance checklist are in [docs/status.
 
 ## Connecting real data
 
+Two free providers are supported and metered through the same budget gateway:
+
+- **football-data.org**: current-season fixtures and results for 12 major competitions (`FOOTBALL_DATA_ORG_KEY`). Used for live testing.
+- **API-Football**: historical seasons 2022-2024 on the free plan, with corners and cards (`API_FOOTBALL_KEY`). Used for research.
+
+Loading data (admin): `node scripts/provider-probe.mjs --admin-email … --admin-password … --jobs '[{"kind":"fdo_competition","competition":"PL"}]'`, then export, fit and import (`docs/setup-free-api-football.md`).
+
+
 1. Create **one** free account at [dashboard.api-football.com](https://dashboard.api-football.com/register).
 2. Put the key in `.dev.vars` (gitignored), never in code, chat or commits:
    ```dotenv

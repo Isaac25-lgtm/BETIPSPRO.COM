@@ -98,6 +98,18 @@ export interface ListParams {
   pageSize: number;
 }
 
+/**
+ * Once real (non-synthetic) reports exist, synthetic demo records are hidden from public listings
+ * so testers never see fictional and real matches mixed. Cached per isolate for 60s.
+ */
+let realReadyCache: { at: number; value: boolean } | null = null;
+export async function realDataReady(env: Env): Promise<boolean> {
+  if (realReadyCache && Date.now() - realReadyCache.at < 60_000) return realReadyCache.value;
+  const r = await env.DB.prepare("SELECT EXISTS (SELECT 1 FROM match_reports r JOIN fixtures f ON f.id = r.fixture_id WHERE f.is_synthetic = 0) AS v").first<{ v: number }>();
+  realReadyCache = { at: Date.now(), value: !!r?.v };
+  return realReadyCache.value;
+}
+
 export async function listFixtures(env: Env, p: ListParams) {
   const where: string[] = [];
   const binds: unknown[] = [];
@@ -109,6 +121,7 @@ export async function listFixtures(env: Env, p: ListParams) {
     range = { start: new Date(now - 30 * 86_400_000).toISOString(), end: new Date(now + 30 * 86_400_000).toISOString() };
   }
   where.push("f.starts_at_utc >= ? AND f.starts_at_utc < ?");
+  if (await realDataReady(env)) where.push("f.is_synthetic = 0");
   binds.push(range.start, range.end);
   if (p.league) { where.push("f.competition_id = ?"); binds.push(p.league); }
   if (p.team) { where.push("(f.home_team_id = ? OR f.away_team_id = ?)"); binds.push(p.team, p.team); }

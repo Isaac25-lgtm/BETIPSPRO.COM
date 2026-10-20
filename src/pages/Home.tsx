@@ -4,7 +4,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../app/auth";
 import { useApi } from "../lib/api";
-import { kickoffTime, longDate, odds, pct, eatYmd } from "../lib/format";
+import { addDays, kickoffDate, kickoffTime, longDate, odds, pct, eatYmd } from "../lib/format";
 import type { FixtureList, FixtureSummary, Report } from "../lib/types";
 import { CompMark, DemoPill, ErrorState, ProbBar, Skeleton, TeamBadge, teamLabel } from "../components/ui";
 
@@ -14,6 +14,8 @@ import { CompMark, DemoPill, ErrorState, ProbBar, Skeleton, TeamBadge, teamLabel
  * gitignored and stripped from production builds. Replace with a licensed photo before launch.
  */
 const LOCAL_REFERENCE_HERO = import.meta.env.DEV && import.meta.env.VITE_LOCAL_REFERENCE_HERO === "true";
+
+const eatYmdOf = (iso: string) => eatYmd(new Date(iso));
 
 export default function Home() {
   return (
@@ -107,15 +109,22 @@ function useTodayBoard() {
 
 function MatchInsightsCard() {
   const { data, error, loading, reload } = useTodayBoard();
-  const rows = (data?.items ?? []).filter((f) => f.featured).sort((a, b) => a.starts_at_utc.localeCompare(b.starts_at_utc)).slice(0, 5);
+  const today = (data?.items ?? []).filter((f) => f.featured);
+  const thin = !!data && today.length < 5;
+  const next1 = useApi<FixtureList>(thin ? `/fixtures?date=${addDays(eatYmd(), 1)}&status=upcoming&page_size=50` : null, { ttlMs: 60_000 });
+  const next2 = useApi<FixtureList>(thin ? `/fixtures?date=${addDays(eatYmd(), 2)}&status=upcoming&page_size=50` : null, { ttlMs: 60_000 });
+  const later = [...(next1.data?.items ?? []), ...(next2.data?.items ?? [])].filter((f) => f.featured);
+  const rows = [...today, ...later].sort((a, b) => a.starts_at_utc.localeCompare(b.starts_at_utc)).slice(0, 5);
+  const includesLater = rows.some((r) => !today.includes(r));
   const anyDemo = rows.some((r) => r.is_synthetic);
+  const showOdds = rows.some((r) => r.featured?.odds);
   return (
     <section className="card insights" aria-labelledby="insights-title">
       <header className="insights-head">
         <div className="ih-title">
-          <h2 id="insights-title">Today&apos;s match insights</h2>
+          <h2 id="insights-title">{includesLater ? "Upcoming match insights" : "Today\u2019s match insights"}</h2>
           <p className="ih-meta">
-            <CalendarDays size={14} aria-hidden="true" /> {longDate(new Date().toISOString())}
+            <CalendarDays size={14} aria-hidden="true" /> {includesLater ? "Today and the next two days" : longDate(new Date().toISOString())}
             {anyDemo && <span className="ih-tag">Synthetic data</span>}
           </p>
         </div>
@@ -126,16 +135,16 @@ function MatchInsightsCard() {
       ) : (
         <>
           <div className="insights-table-wrap">
-            <table className="insights-table">
+            <table className={`insights-table ${showOdds ? "" : "no-odds"}`}>
               <caption className="sr-only">Today&apos;s fixtures with one featured market each. Featured means the model differs most from the league base rate; it is not a recommendation.</caption>
               <colgroup>
-                <col className="c-match" /><col className="c-market" /><col className="c-odds" /><col className="c-prob" /><col className="c-league" /><col className="c-time" />
+                <col className="c-match" /><col className="c-market" />{showOdds && <col className="c-odds" />}<col className="c-prob" /><col className="c-league" /><col className="c-time" />
               </colgroup>
               <thead>
                 <tr>
                   <th scope="col">Match</th>
                   <th scope="col" title="The market where the model differs most from the league's historical base rate. Not a recommendation.">Featured market</th>
-                  <th scope="col">Odds</th>
+                  {showOdds && <th scope="col">Odds</th>}
                   <th scope="col">Model probability</th>
                   <th scope="col">League</th>
                   <th scope="col">Time</th>
@@ -148,12 +157,12 @@ function MatchInsightsCard() {
                         <td colSpan={6}><Skeleton h={22} /></td>
                       </tr>
                     ))
-                  : rows.map((f) => <InsightRow key={f.id} f={f} />)}
+                  : rows.map((f) => <InsightRow key={f.id} f={f} showOdds={showOdds} />)}
               </tbody>
             </table>
           </div>
           <ul className="insights-cards" aria-label="Today's fixtures">
-            {loading && !data ? Array.from({ length: 3 }, (_, i) => <li key={i}><Skeleton h={88} r={12} /></li>) : rows.map((f) => <InsightCard key={f.id} f={f} />)}
+            {loading && !data ? Array.from({ length: 3 }, (_, i) => <li key={i}><Skeleton h={88} r={12} /></li>) : rows.map((f) => <InsightCard key={f.id} f={f} showOdds={showOdds} />)}
           </ul>
           {!loading && rows.length === 0 && (
             <div className="empty-state">
@@ -178,7 +187,7 @@ function OddsCell({ f }: { f: FixtureSummary }) {
   );
 }
 
-function InsightRow({ f }: { f: FixtureSummary }) {
+function InsightRow({ f, showOdds }: { f: FixtureSummary; showOdds: boolean }) {
   const to = `/matches/${encodeURIComponent(f.id)}`;
   return (
     <tr className="insight-row">
@@ -192,7 +201,7 @@ function InsightRow({ f }: { f: FixtureSummary }) {
         </Link>
       </td>
       <td className="market-cell"><Link to={to}>{f.featured?.short_label}</Link></td>
-      <td><OddsCell f={f} /></td>
+      {showOdds && <td><OddsCell f={f} /></td>}
       <td>
         <span className="conf-cell">
           <ProbBar p={f.featured?.probability ?? null} width={80} />
@@ -205,18 +214,18 @@ function InsightRow({ f }: { f: FixtureSummary }) {
           <span className="league-name">{f.competition.short_name}</span>
         </span>
       </td>
-      <td className="num time-cell">{kickoffTime(f.starts_at_utc)}</td>
+      <td className="num time-cell">{eatYmdOf(f.starts_at_utc) === eatYmd() ? kickoffTime(f.starts_at_utc) : `${kickoffDate(f.starts_at_utc, { weekday: "short" })} ${kickoffTime(f.starts_at_utc)}`}</td>
     </tr>
   );
 }
 
-function InsightCard({ f }: { f: FixtureSummary }) {
+function InsightCard({ f, showOdds }: { f: FixtureSummary; showOdds: boolean }) {
   return (
     <li>
       <Link to={`/matches/${encodeURIComponent(f.id)}`} className="insight-card">
         <div className="ic-top">
           <span className="league-cell small"><CompMark name={f.competition.name} synthetic={f.competition.is_synthetic} /> {f.competition.short_name}</span>
-          <span className="num ic-time">{kickoffTime(f.starts_at_utc)}</span>
+          <span className="num ic-time">{eatYmdOf(f.starts_at_utc) === eatYmd() ? kickoffTime(f.starts_at_utc) : `${kickoffDate(f.starts_at_utc, { weekday: "short" })} ${kickoffTime(f.starts_at_utc)}`}</span>
         </div>
         <div className="ic-teams">
           <span><TeamBadge team={f.home} size={26} /> {teamLabel(f.home, 22)}</span>
@@ -226,7 +235,7 @@ function InsightCard({ f }: { f: FixtureSummary }) {
           <span className="ic-label">{f.featured?.short_label}</span>
           <ProbBar p={f.featured?.probability ?? null} width={64} />
           <span className="num conf-pct">{pct(f.featured?.probability)}</span>
-          <OddsCell f={f} />
+          {showOdds && <OddsCell f={f} />}
           <ChevronRight size={18} className="muted" aria-hidden="true" />
         </div>
       </Link>
@@ -289,8 +298,11 @@ function PremiumCard() {
 }
 
 function PerformanceCard() {
-  const { data } = useApi<{ counts: { verified_live_settled: number | null; live_published: number | null } }>("/statistics/models", { ttlMs: 120_000 });
+  const { data } = useApi<{ counts: { verified_live_settled: number | null; live_published: number | null }; backtest_run: { data_mode: string } | null; evaluations: Array<{ competition_id: string | null; log_loss: number; baseline_log_loss: number }> }>("/statistics/models", { ttlMs: 120_000 });
   const verified = data?.counts?.verified_live_settled ?? 0;
+  const realBacktest = data?.backtest_run && data.backtest_run.data_mode !== "SIMULATED_DEMO";
+  const overall = (data?.evaluations ?? []).filter((e) => e.competition_id == null);
+  const beats = overall.filter((e) => e.log_loss < e.baseline_log_loss).length;
   return (
     <section className="card perf" aria-labelledby="perf-title">
       <div className="perf-head">
@@ -300,7 +312,11 @@ function PerformanceCard() {
       </div>
       <div className="perf-kpis">
         <div><strong className="num">{verified}</strong><span>Verified live forecasts</span></div>
-        <div><strong className="kpi-status"><i className="dot dot-amber" />Pending</strong><span>Real-data backtest</span></div>
+        {realBacktest && overall.length ? (
+          <div><strong className="num">{beats}/{overall.length}</strong><span>Markets beating the baseline</span></div>
+        ) : (
+          <div><strong className="kpi-status"><i className="dot dot-amber" />Pending</strong><span>Real-data backtest</span></div>
+        )}
         <div><strong className="kpi-status"><i className="dot dot-blue" />In review</strong><span>Calibration</span></div>
       </div>
       <Link to="/statistics" className="perf-link">How we measure accuracy <ChevronRight size={15} /></Link>
@@ -318,12 +334,16 @@ function ReportShowcase() {
   const sample = board.data?.items.find((f) => f.is_public_sample);
   const { data: r } = useApi<Report>(sample ? `/fixtures/${encodeURIComponent(sample.id)}/report` : null, { ttlMs: 300_000 });
   const get = (id: string) => r?.markets.find((m) => m.id === id);
-  const rows: Array<[string, string]> = [
+  const candidates: Array<[string, string]> = [
     ["TOTAL_GOALS_OVER_2_5_REGULATION", "Over 2.5 goals"],
     ["BTTS_YES_REGULATION", "Both teams to score"],
     ["TOTAL_CORNERS_OVER_9_5_REGULATION", "Over 9.5 corners"],
     ["TOTAL_YELLOW_CARDS_OVER_3_5_REGULATION", "Over 3.5 yellow cards"],
+    ["FIRST_HALF_GOALS_OVER_0_5", "Goal in the first half"],
+    ["DOUBLE_CHANCE_HOME_DRAW_REGULATION", "Home win or draw"],
+    ["TOTAL_GOALS_OVER_3_5_REGULATION", "Over 3.5 goals"],
   ];
+  const rows = candidates.filter(([id]) => get(id)?.probability != null).slice(0, 4);
   return (
     <section className="showcase" aria-labelledby="showcase-title">
       <div className="container showcase-grid">
@@ -395,7 +415,7 @@ function RecentResults() {
         <div className="section-head">
           <div className="row-wrap">
             <h2 id="results-title" className="h-section">Recent results vs forecasts</h2>
-            {(synthetic || backtest) && <DemoPill label={backtest ? "Synthetic backtest" : "Synthetic"} />}
+            {synthetic ? <DemoPill label={backtest ? "Synthetic backtest" : "Synthetic"} /> : backtest && <span className="pill pill-gray" title="Computed after the matches using only data available before kick-off">Retrospective backtest</span>}
           </div>
           <Link to="/predictions/archive" className="link">Full forecast archive <ArrowRight size={16} /></Link>
         </div>

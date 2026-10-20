@@ -5,7 +5,7 @@ import { dataMode, flag, num } from "../env.ts";
 import { ApiError, ok } from "../lib/http.ts";
 import { todayEat } from "../lib/time.ts";
 import { catalog, marketById } from "../../shared/markets.ts";
-import { fixturePreview, listFixtures } from "../services/fixtures.ts";
+import { fixturePreview, listFixtures, realDataReady } from "../services/fixtures.ts";
 import { publicCache } from "../middleware/public-cache.ts";
 
 const PUBLIC_CACHE = "public, max-age=30, s-maxage=60, stale-while-revalidate=120";
@@ -24,7 +24,7 @@ publicRoutes.get("/health", async (c) => {
 
 publicRoutes.get("/config/public", async (c) => {
   // The demo banner must follow the DATA being shown, not just whether a provider key exists.
-  const syn = await c.env.DB.prepare("SELECT EXISTS (SELECT 1 FROM fixtures WHERE is_synthetic = 1) AS s").first<{ s: number }>();
+  const syn = (await realDataReady(c.env)) ? { s: 0 } : await c.env.DB.prepare("SELECT EXISTS (SELECT 1 FROM fixtures WHERE is_synthetic = 1) AS s").first<{ s: number }>();
   return ok(c, {
     data_mode: dataMode(c.env),
     synthetic_data_present: !!syn?.s,
@@ -48,8 +48,8 @@ publicRoutes.get("/competitions", async (c) => {
             (SELECT COUNT(*) FROM fixtures f WHERE f.competition_id = c.id AND f.status IN ('FT','AET','PEN')) AS completed,
             (SELECT COUNT(DISTINCT r.fixture_id) FROM match_reports r JOIN fixtures f ON f.id = r.fixture_id WHERE f.competition_id = c.id) AS reports,
             (SELECT COUNT(*) FROM teams t WHERE t.competition_id = c.id) AS teams
-       FROM competitions c ORDER BY c.is_synthetic, c.display_order, c.name`,
-  ).all<Record<string, unknown>>();
+       FROM competitions c WHERE (?1 = 0 OR c.is_synthetic = 0) ORDER BY c.is_synthetic, c.display_order, c.name`,
+  ).bind((await realDataReady(c.env)) ? 1 : 0).all<Record<string, unknown>>();
   let items = rows.results.map((r) => ({ ...r, is_synthetic: !!r.is_synthetic, coverage: JSON.parse((r.coverage_json as string) ?? "{}"), coverage_json: undefined }));
   if (supported === "true") items = items.filter((i) => ((i as Record<string, unknown>).completed as number) > 0);
   return ok(c, { items }, { cache: PUBLIC_CACHE });
@@ -146,6 +146,7 @@ publicRoutes.get("/predictions/archive", async (c) => {
   if (!parsed.success) throw new ApiError(400, "VALIDATION_FAILED", "Invalid query parameters.", parsed.error.flatten());
   const q = parsed.data;
   const where = ["fo.probability IS NOT NULL"];
+  if (await realDataReady(c.env)) where.push("f.is_synthetic = 0");
   const binds: unknown[] = [];
   if (q.league) { where.push("f.competition_id = ?"); binds.push(q.league); }
   if (q.market) {

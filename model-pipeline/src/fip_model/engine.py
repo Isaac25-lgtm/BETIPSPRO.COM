@@ -268,8 +268,12 @@ def _card_row(m: CompModels, home: str, away: str, ref: str | None) -> np.ndarra
 
 
 def distributions(m: CompModels, home: str, away: str, ref: str | None, gp=None, hp=None, cp=None, kp=None) -> Distributions:
-    ft = m.goals.score_matrix(home, away, gp) if m.goals else None
-    ht = m.ht.score_matrix(home, away, hp) if m.ht else None
+    # A team with no matches before the cut-off has no rating: that component is unavailable
+    # (the market is then reported as INSUFFICIENT), never guessed.
+    def knows(fit):
+        return fit is not None and home in fit.team_index and away in fit.team_index
+    ft = m.goals.score_matrix(home, away, gp) if knows(m.goals) else None
+    ht = m.ht.score_matrix(home, away, hp) if knows(m.ht) else None
     corners_total = cards_total = None
     k = np.arange(CORNER_PMF_SIZE)
     if m.corners:
@@ -350,7 +354,7 @@ def drivers(m: CompModels, fx: dict) -> list[dict]:
                     "value": None if value is None else round(float(value), 5),
                     "value_json": value_json, "sample_window": window, "source_ref": ref_})
 
-    if m.goals:
+    if m.goals and home in m.goals.team_index and away in m.goals.team_index:
         mu, ha, rho, att, dfn = m.goals.unpack()
         hi, ai = m.goals.team_index[home], m.goals.team_index[away]
         lh, la = m.goals.rates(home, away)
@@ -368,7 +372,7 @@ def drivers(m: CompModels, fx: dict) -> list[dict]:
         add("goals_dixon_coles", "time_decay_half_life_days", np.log(2) / m.goals.xi)
         add("goals_dixon_coles", "matches_home_team", m.team_counts.get(home, 0))
         add("goals_dixon_coles", "matches_away_team", m.team_counts.get(away, 0))
-    if m.ht:
+    if m.ht and home in m.ht.team_index and away in m.ht.team_index:
         lh, la = m.ht.rates(home, away)
         add("first_half_poisson", "expected_ht_goals_home", lh)
         add("first_half_poisson", "expected_ht_goals_away", la)
@@ -454,7 +458,7 @@ def evaluate(records: list[dict], comp_ids: list[str | None]) -> list[dict]:
 # ------------------------------------------------------------------ orchestration
 
 def run(dataset: Dataset, catalog: dict, data_mode: str, now: datetime, seed: int = 7,
-        backtest_rounds: int = 7, synthetic_odds: bool = False) -> dict:
+        backtest_rounds: int = 7, synthetic_odds: bool = False, horizon_days: int | None = None) -> dict:
     rng = np.random.default_rng(seed)
     demo = data_mode == "SIMULATED_DEMO"
     df = dataset.matches()
@@ -472,6 +476,8 @@ def run(dataset: Dataset, catalog: dict, data_mode: str, now: datetime, seed: in
             continue
         # ---- live forecasts for upcoming fixtures (cut-off = now)
         upcoming = cdf[(cdf["status"].isin(["NS", "TBD"])) & (cdf["ko"] > now_ts)]
+        if horizon_days is not None:
+            upcoming = upcoming[upcoming["ko"] <= now_ts + pd.Timedelta(days=horizon_days)]
         if not upcoming.empty:
             models = fit_competition(cdf, now_ts, catalog, with_uncertainty=True)
             if models.as_of is not None:

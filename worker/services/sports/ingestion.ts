@@ -9,10 +9,12 @@ import { ApiError } from "../../lib/http.ts";
 import { newId } from "../../lib/crypto.ts";
 import { nowIso, todayEat } from "../../lib/time.ts";
 import { ApiFootballProvider } from "../../providers/api-football/index.ts";
+import { FootballDataOrgProvider } from "../../providers/football-data-org/index.ts";
+import { providerConfigured } from "./budget.ts";
 import type { FixtureBundle, OddsSnapshot } from "../../providers/types.ts";
 import type { Priority } from "./budget.ts";
 
-export type IngestKind = "status" | "fixtures_by_date" | "league_season" | "fixture_details" | "odds" | "team_last";
+export type IngestKind = "status" | "fixtures_by_date" | "league_season" | "fixture_details" | "odds" | "team_last" | "fdo_competition";
 
 export interface IngestRequest {
   kind: IngestKind;
@@ -23,6 +25,8 @@ export interface IngestRequest {
   last?: number;
   provider_ids?: string[];
   fixture?: string;
+  /** football-data.org competition code, e.g. PL, PD, CL */
+  competition?: string;
   priority?: Priority;
 }
 
@@ -53,7 +57,9 @@ export async function upsertBundle(env: Env, b: FixtureBundle): Promise<number> 
     s.push(env.DB.prepare(
       `INSERT INTO competitions (id, provider, provider_id, name, short_name, country, is_synthetic, current_season, coverage_json, rights_status, source_updated_at)
        VALUES (?, ?, ?, ?, ?, ?, 0, ?, '{"loaded":true}', 'review_required', ?)
-       ON CONFLICT(id) DO UPDATE SET current_season = excluded.current_season, coverage_json = '{"loaded":true}', source_updated_at = excluded.source_updated_at`,
+       ON CONFLICT(id) DO UPDATE SET
+         current_season = CASE WHEN COALESCE(excluded.current_season, '') > COALESCE(competitions.current_season, '') THEN excluded.current_season ELSE competitions.current_season END,
+         coverage_json = '{"loaded":true}', source_updated_at = excluded.source_updated_at`,
     ).bind(c.id, c.provider, c.provider_id, c.name, c.short_name, c.country, c.current_season, now));
   }
   for (const t of b.teams) {
@@ -101,7 +107,11 @@ async function storeOdds(env: Env, odds: OddsSnapshot[]): Promise<number> {
 }
 
 export async function runIngestion(env: Env, req: IngestRequest, actor: string): Promise<Record<string, unknown>> {
-  if (dataMode(env) === "DEMO") throw new ApiError(503, "PROVIDER_UNCONFIGURED", "Provider not configured (demo mode). Set SPORTS_PROVIDER=api_football and API_FOOTBALL_KEY in .dev.vars.");
+  if (req.kind === "fdo_competition") {
+    if (!providerConfigured(env, "football_data_org")) throw new ApiError(503, "PROVIDER_UNCONFIGURED", "football-data.org token not configured. Set FOOTBALL_DATA_ORG_KEY in .dev.vars.");
+  } else if (dataMode(env) === "DEMO") {
+    throw new ApiError(503, "PROVIDER_UNCONFIGURED", "Provider not configured (demo mode). Set SPORTS_PROVIDER=api_football and API_FOOTBALL_KEY in .dev.vars.");
+  }
   const jobId = newId("job");
   if (!(await acquireLock(env, jobId))) throw new ApiError(409, "CONFLICT", "Another ingestion job is running. Jobs are serialised to protect the provider quota.");
   const startedCalls = await callsForJob(env, jobId);
@@ -130,6 +140,12 @@ export async function runIngestion(env: Env, req: IngestRequest, actor: string):
         if (!ids.length) throw new ApiError(422, "VALIDATION_FAILED", "provider_ids (1-20) required");
         const b = await provider.getFixtures(ids);
         detail = { fixtures: await upsertBundle(env, b), team_stat_rows: b.stats.length };
+        break;
+      }
+      case "fdo_competition": {
+        if (!req.competition) throw new ApiError(422, "VALIDATION_FAILED", "competition code is required (e.g. PL)");
+        const b = await new FootballDataOrgProvider(env, { jobId, priority: req.priority ?? "normal" }).competitionSeason(req.competition, req.season);
+        detail = { fixtures: await upsertBundle(env, b), competition: req.competition, season: b.competitions[0]?.current_season ?? null };
         break;
       }
       case "odds":
@@ -181,8 +197,8 @@ export async function scheduledRefresh(env: Env): Promise<string> {
 /** Normalised history export for the offline Python pipeline (no provider calls). */
 export async function exportHistory(env: Env, provider: string) {
   const [c, t, r, f, s] = await env.DB.batch<Record<string, unknown>>([
-    env.DB.prepare("SELECT id, provider, provider_id, name, short_name, country, is_synthetic, current_season FROM competitions WHERE provider = ?").bind(provider),
-    env.DB.prepare("SELECT id, provider, provider_id, name, short_name, code, country, primary_color, secondary_color, competition_id, is_synthetic FROM teams WHERE provider = ?").bind(provider),
+    env.DB.prepare("SELECT id, provider, provider_id, name, short_name, country, is_synthetic, current_season FROM competitions WHERE id IN (SELECT DISTINCT competition_id FROM fixtures WHERE provider = ?)").bind(provider),
+    env.DB.prepare("SELECT id, provider, provider_id, name, short_name, code, country, primary_color, secondary_color, competition_id, is_synthetic FROM teams WHERE id IN (SELECT home_team_id FROM fixtures WHERE provider = ?1 UNION SELECT away_team_id FROM fixtures WHERE provider = ?1)").bind(provider),
     env.DB.prepare("SELECT DISTINCT r.id, r.name, r.is_synthetic FROM referees r JOIN fixtures f ON f.referee_id = r.id WHERE f.provider = ?").bind(provider),
     env.DB.prepare(`SELECT id, provider, provider_id, competition_id, season, round, home_team_id, away_team_id, starts_at_utc, status,
                            home_goals, away_goals, home_goals_ht, away_goals_ht, venue_name, venue_city, referee_id, is_synthetic FROM fixtures WHERE provider = ? ORDER BY starts_at_utc`).bind(provider),

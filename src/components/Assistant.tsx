@@ -69,12 +69,18 @@ export function Assistant() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { try { sessionStorage.setItem("asst-msgs", JSON.stringify(msgs.slice(-20))); } catch { /* private mode */ } }, [msgs]);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs, busy, open]);
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 50); }, [open]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     window.addEventListener("keydown", onKey);
@@ -101,8 +107,17 @@ export function Assistant() {
     }
   };
 
+  // A link in an answer opens a page behind the chat: close the chat so the page is visible, and say so briefly.
+  const onBodyClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("a.asst-link")) {
+      setOpen(false);
+      setToast("Opening the match. Your chat is saved: tap Ask BetTipsPro AI to continue.");
+    }
+  };
+
   return (
     <>
+      {toast && <div className="asst-toast" role="status">{toast}</div>}
       {!open && (
         <button className="asst-fab" onClick={() => setOpen(true)} aria-label="Ask BetTipsPro AI">
           <Sparkles size={18} aria-hidden="true" /> <span>Ask BetTipsPro AI</span>
@@ -116,7 +131,7 @@ export function Assistant() {
             {msgs.length > 0 && <button className="asst-icon" onClick={() => { setMsgs([]); setErr(null); }} aria-label="New chat" title="New chat"><RotateCcw size={16} /></button>}
             <button className="asst-icon" onClick={() => setOpen(false)} aria-label="Close"><X size={18} /></button>
           </header>
-          <div className="asst-body">
+          <div className="asst-body" onClick={onBodyClick}>
             {msgs.length === 0 && (
               <div className="asst-intro">
                 <p>Ask about upcoming matches, probabilities and form. Try one of these:</p>

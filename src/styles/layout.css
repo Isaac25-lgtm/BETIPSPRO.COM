@@ -171,3 +171,8 @@
 .prob-mid .prob-interval { background: rgba(224, 160, 25, .2); }
 .prob-low .prob-interval { background: rgba(217, 84, 31, .18); }
 .pct-high { color: var(--accent-text) !important; } .pct-mid { color: #9a6a00 !important; } .pct-low { color: #b23c12 !important; }
+
+.asst-toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 80; transform: translateX(-50%); width: max-content; max-width: min(420px, calc(100vw - 32px)); padding: 11px 16px; border-radius: 12px; background: var(--navy-950); border: 1px solid rgba(29, 249, 146, .55); color: #fff; font-size: 14px; line-height: 1.4; box-shadow: var(--shadow-pop); animation: asst-toast-in .2s var(--ease); }
+@keyframes asst-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .asst-toast { animation: none; } }
+@media (max-width: 767px) { .asst-toast { bottom: calc(130px + env(safe-area-inset-bottom, 0px)); } }

@@ -344,35 +344,104 @@ def motion_streak(img: np.ndarray, cx, cy, r, angle_deg=200, length=2.6) -> np.n
     return screen(img, streak[..., None] * 0.45 * hex_rgb("#bfe6ff"))
 
 
-def hero(W=3200, H=830) -> np.ndarray:
-    img = stadium(W, H, focus=(0.70, 0.30), pitch_top=0.70, seed=3)
-    img = distant_players(img, [(0.47, 0.80, 0.16, 1), (0.585, 0.745, 0.12, 0), (0.655, 0.775, 0.14, 3), (0.94, 0.79, 0.15, 2), (0.53, 0.725, 0.09, 2), (0.885, 0.735, 0.10, 1)])
-    img = trajectory(img, (0.40, 0.92), (0.58, 0.05), (0.735, 0.40))
-    ball_r = 0.33
-    cx, cy = 0.79, 0.47
-    img = motion_streak(img, cx, cy, ball_r, angle_deg=195)
-    b = int(H * ball_r * 2)
-    img = paste_rgba(img, render_ball(b, rot=(0.5, 0.9, 0.3), light=(-0.55, -0.55, 0.62)), int(cx * W - b / 2), int(cy * H - b / 2))
-    img = green_shards(img, 0.88, 0.9)
+def crowd_flashes(img, x0, x1, y0, y1, n, seed):
+    """Camera flashes / phone lights scattered through the stands (packed-stadium feel)."""
+    H, W = img.shape[:2]
+    rng = np.random.default_rng(seed)
+    pts = np.zeros((H, W), np.float32)
+    xs = rng.uniform(x0, x1, n) * W
+    ys = (y0 + (y1 - y0) * rng.beta(1.2, 2.2, n)) * H
+    for x, y in zip(xs.astype(int), ys.astype(int)):
+        if 0 <= x < W and 0 <= y < H:
+            pts[y, x] = rng.uniform(0.4, 1.0)
+    glow = blur(pts, 1.6) * 7 + blur(pts, 6) * 16
+    return screen(img, np.clip(glow, 0, 1)[..., None] * hex_rgb("#e6f2ff") * 0.8)
+
+
+def volumetric_rays(img, origin, n=7, seed=0, strength=0.10):
+    H, W = img.shape[:2]
+    rng = np.random.default_rng(seed)
     y, x = np.mgrid[0:H, 0:W].astype(np.float32)
-    dark = np.clip(1 - (x / W - 0.16) / 0.40, 0, 1) ** 1.4 * 0.55
-    img = img * (1 - dark[..., None]) + hex_rgb("#001424") * dark[..., None]
+    ang = np.arctan2(y - origin[1] * H, x - origin[0] * W)
+    rays = np.zeros((H, W), np.float32)
+    for _ in range(n):
+        a0 = math.radians(rng.uniform(100, 170))
+        width = rng.uniform(0.004, 0.012)
+        rays += np.exp(-((ang - a0) ** 2) / width) * rng.uniform(0.5, 1.0)
+    dist = np.sqrt((x - origin[0] * W) ** 2 + (y - origin[1] * H) ** 2) / H
+    rays *= np.exp(-dist * 0.9)
+    return screen(img, blur(rays, 3)[..., None] * strength * hex_rgb("#cfe6ff"))
+
+
+def ball_in_motion(img, cx, cy, r, angle_deg=198, trail=0.55, rot=(0.5, 0.9, 0.3), seed=4):
+    """Hero ball with a motion trail, speed lines, green back-glow and kicked-up grass spray."""
+    H, W = img.shape[:2]
+    rng = np.random.default_rng(seed)
+    b = int(H * r * 2)
+    ball = render_ball(b, rot=rot, light=(-0.55, -0.6, 0.6), rim=(0.7, -0.4, -0.2), rim_color="#d9f6ff")
+    x0, y0 = int(cx * W - b / 2), int(cy * H - b / 2)
+    mask = np.zeros((H, W), np.float32)
+    sub = ball[..., 3]
+    ys, xs = slice(max(y0, 0), min(y0 + b, H)), slice(max(x0, 0), min(x0 + b, W))
+    mask[ys, xs] = sub[ys.start - y0 : ys.stop - y0, xs.start - x0 : xs.stop - x0]
+    a = math.radians(angle_deg)
+    dx, dy = math.cos(a), math.sin(a)
+    # motion trail: decaying shifted copies of the silhouette
+    trail_m = np.zeros_like(mask)
+    steps = 14
+    for i in range(1, steps + 1):
+        sh = int(i * trail * b / steps)
+        trail_m = np.maximum(trail_m, np.roll(mask, (int(sh * dy), int(sh * dx)), (0, 1)) * (1 - i / (steps + 1)) ** 1.6)
+    trail_m = blur(trail_m * (1 - mask), H * 0.012)
+    img = screen(img, trail_m[..., None] * 0.8 * hex_rgb("#9fd6ff"))
+    # speed lines
+    lines = mask_from_draw(W, H, lambda d, ss: [
+        d.line([((cx * W + (rng.uniform(-0.2, 0.1)) * b) * ss, (cy * H + o * b) * ss),
+                ((cx * W + (rng.uniform(-0.2, 0.1)) * b + dx * rng.uniform(0.6, 1.3) * b) * ss, (cy * H + o * b + dy * rng.uniform(0.6, 1.3) * b) * ss)],
+               fill=int(rng.uniform(120, 255)), width=max(1, int(H * 0.0025 * ss)))
+        for o in np.linspace(-0.42, 0.42, 9)], ss=2)
+    img = screen(img, blur(lines * (1 - mask), 1.2)[..., None] * 0.45 * hex_rgb("#dff3ff"))
+    # brand-green back glow + white rim halo
+    halo = blur(mask, H * 0.05)
+    img = screen(img, halo[..., None] * 0.55 * hex_rgb("#1df992"))
+    img = screen(img, blur(mask, H * 0.012)[..., None] * 0.35 * hex_rgb("#e8f8ff"))
+    img = paste_rgba(img, ball, x0, y0)
+    # grass spray below/behind the ball
+    spray = np.zeros((H, W), np.float32)
+    for _ in range(900):
+        px = cx * W + rng.normal(-0.15, 0.55) * b
+        py = (cy + r * 0.95) * H + rng.normal(0, 0.22) * b - abs(rng.normal(0, 0.25)) * b
+        if 0 <= int(px) < W and 0 <= int(py) < H:
+            spray[int(py), int(px)] = rng.uniform(0.3, 1.0)
+    spray = blur(spray, 1.4) * 3
+    img = comp(img, hex_rgb("#1d6b3a"), np.clip(spray, 0, 1) * 0.85)
+    img = screen(img, np.clip(blur(spray, 3) * 2, 0, 1)[..., None] * 0.25 * hex_rgb("#bfffe0"))
     return img
 
 
+def hero(W=3200, H=830) -> np.ndarray:
+    img = stadium(W, H, focus=(0.74, 0.30), pitch_top=0.76, seed=3)
+    img = crowd_flashes(img, 0.46, 1.0, 0.16, 0.62, 900, seed=8)
+    img = volumetric_rays(img, (0.86, 0.02), n=9, seed=2, strength=0.12)
+    img = ball_in_motion(img, cx=0.795, cy=0.50, r=0.40)
+    img = green_shards(img, 0.90, 0.95)
+    y, x = np.mgrid[0:H, 0:W].astype(np.float32)
+    dark = np.clip(1 - (x / W - 0.14) / 0.40, 0, 1) ** 1.4 * 0.6
+    img = img * (1 - dark[..., None]) + hex_rgb("#001424") * dark[..., None]
+    img += (np.random.default_rng(1).random((H, W, 1)).astype(np.float32) - 0.5) * 0.018
+    return np.clip(img, 0, 1)
+
+
 def hero_mobile(W=1200, H=1350) -> np.ndarray:
-    img = stadium(W, H, focus=(0.62, 0.20), pitch_top=0.42, seed=5)
-    img = distant_players(img, [(0.18, 0.52, 0.10, 1), (0.36, 0.48, 0.075, 0), (0.92, 0.50, 0.09, 2)])
-    img = trajectory(img, (0.05, 0.50), (0.30, 0.02), (0.55, 0.22), width=0.003)
-    cx, cy, r = 0.72, 0.25, 0.16
-    img = motion_streak(img, cx, cy, r, angle_deg=200, length=2.2)
-    b = int(H * r * 2)
-    img = paste_rgba(img, render_ball(b, rot=(0.5, 0.9, 0.3)), int(cx * W - b / 2), int(cy * H - b / 2))
+    img = stadium(W, H, focus=(0.62, 0.20), pitch_top=0.44, seed=5)
+    img = crowd_flashes(img, 0.0, 1.0, 0.06, 0.38, 450, seed=9)
+    img = volumetric_rays(img, (0.8, 0.0), n=7, seed=3, strength=0.12)
+    img = ball_in_motion(img, cx=0.70, cy=0.25, r=0.16, trail=0.6)
     img = green_shards(img, 0.80, 0.5)
     y = np.mgrid[0:H, 0:W][0].astype(np.float32)
     dark = np.clip((y / H - 0.40) / 0.30, 0, 1) ** 1.2 * 0.94
     img = img * (1 - dark[..., None]) + hex_rgb("#001424") * dark[..., None]
-    return img
+    return np.clip(img, 0, 1)
 
 
 def league_tile(W, H, tint, accent, seed, ball_pos=None) -> np.ndarray:

@@ -1,11 +1,11 @@
 import { Link } from "react-router";
 import {
-  ArrowRight, BarChart3, BookOpenCheck, CalendarDays, Check, ChevronRight, Crown, Database, FileSearch, Gauge, Layers, LineChart, Scale, ShieldCheck, Sigma, Trophy, Zap,
+  ArrowRight, BarChart3, CalendarDays, Check, ChevronRight, Crown, Layers, Scale, ShieldCheck, Trophy, Zap,
 } from "lucide-react";
 import { useAuth } from "../app/auth";
 import { useApi } from "../lib/api";
 import { kickoffTime, longDate, odds, pct, eatYmd } from "../lib/format";
-import type { FixtureList, FixtureSummary } from "../lib/types";
+import type { FixtureList, FixtureSummary, Report } from "../lib/types";
 import { CompMark, DemoPill, ErrorState, ProbBar, Skeleton, TeamBadge } from "../components/ui";
 
 export default function Home() {
@@ -22,11 +22,9 @@ export default function Home() {
           <PerformanceCard />
         </aside>
       </div>
-      <ArchivePreview />
-      <HowItWorks />
-      <SampleAnalysis />
-      <Coverage />
-      <BetaPricing />
+      <ReportShowcase />
+      <RecentResults />
+      <BetaBand />
       <ResponsibleBand />
     </div>
   );
@@ -111,6 +109,9 @@ function MatchInsightsCard() {
           <div className="insights-table-wrap">
             <table className="insights-table">
               <caption className="sr-only">Today&apos;s fixtures with one featured market each. Featured means the model differs most from the league base rate; it is not a recommendation.</caption>
+              <colgroup>
+                <col className="c-match" /><col className="c-market" /><col className="c-odds" /><col className="c-prob" /><col className="c-league" /><col className="c-time" />
+              </colgroup>
               <thead>
                 <tr>
                   <th scope="col">Match</th>
@@ -180,9 +181,9 @@ function InsightRow({ f }: { f: FixtureSummary }) {
         </span>
       </td>
       <td>
-        <span className="league-cell">
+        <span className="league-cell" title={f.competition.name}>
           <CompMark name={f.competition.name} synthetic={f.competition.is_synthetic} />
-          {f.competition.short_name}
+          <span className="league-name">{f.competition.short_name}</span>
         </span>
       </td>
       <td className="num time-cell">{kickoffTime(f.starts_at_utc)}</td>
@@ -215,9 +216,9 @@ function InsightCard({ f }: { f: FixtureSummary }) {
 }
 
 const LEAGUES = [
-  { id: "apif:39", title: "Premier League Hub", text: "In-depth evidence and model probabilities for EPL matches.", cta: "View EPL Hub", img: "/images/league-premier.webp", Icon: Crown },
-  { id: "apif:140", title: "La Liga Hub", text: "Research Spain's biggest matches with transparent evidence.", cta: "View La Liga Hub", img: "/images/league-liga.webp", Icon: Layers },
-  { id: "apif:2", title: "Champions League Hub", text: "Europe's elite club competition, analysed match by match.", cta: "View UCL Hub", img: "/images/league-continental.webp", Icon: Trophy },
+  { id: "apif:39", title: "Premier League Hub", text: "Evidence and model probabilities for EPL matches.", cta: "View EPL Hub", img: "/images/league-premier.webp", Icon: Crown },
+  { id: "apif:140", title: "La Liga Hub", text: "Transparent research on Spain's top-flight matches.", cta: "View La Liga Hub", img: "/images/league-liga.webp", Icon: Layers },
+  { id: "apif:2", title: "Champions League Hub", text: "Europe's elite club competition, match by match.", cta: "View UCL Hub", img: "/images/league-continental.webp", Icon: Trophy },
 ];
 
 function LeagueTiles() {
@@ -225,11 +226,13 @@ function LeagueTiles() {
     <section className="league-tiles" aria-label="League hubs">
       {LEAGUES.map(({ id, title, text, cta, img, Icon }) => (
         <Link key={id} to={`/leagues/${encodeURIComponent(id)}`} className="league-tile" style={{ backgroundImage: `url(${img})` }}>
-          <span className="lt-icon"><Icon size={34} strokeWidth={1.8} /></span>
-          <span className="lt-body">
-            <span className="lt-title">{title}</span>
-            <span className="lt-text">{text}</span>
-            <span className="lt-cta">{cta} <ArrowRight size={15} /></span>
+          <span className="lt-inner">
+            <span className="lt-icon" aria-hidden="true"><Icon size={46} strokeWidth={1.6} /></span>
+            <span className="lt-body">
+              <span className="lt-title">{title}</span>
+              <span className="lt-text">{text}</span>
+              <span className="lt-cta">{cta} <ArrowRight size={14} /></span>
+            </span>
           </span>
         </Link>
       ))}
@@ -285,114 +288,72 @@ function PerformanceCard() {
 
 // ---------------------------------------------------------------- lower sections
 
-function ArchivePreview() {
-  const { data } = useApi<{ items: Array<{ id: string; fixture_id: string; market_label: string; probability: number; settled_outcome: number | null; home: string; away: string; home_goals: number | null; away_goals: number | null; starts_at_utc: string; is_pre_kickoff: boolean; is_synthetic: boolean; competition: string }> }>(
-    "/predictions/archive?settled=settled&market=TOTAL_GOALS_OVER_2_5_REGULATION",
-    { ttlMs: 120_000 },
-  );
-  const items = data?.items.slice(0, 6) ?? [];
-  return (
-    <section className="section" aria-labelledby="archive-title">
-      <div className="container">
-        <div className="section-head">
-          <div>
-            <span className="eyebrow">Accountability</span>
-            <h2 id="archive-title" className="h-section">Past forecasts &amp; results</h2>
-            <p className="lede">Every forecast is stored immutably with its timestamp and data cut-off, then settled against the actual result. We never rewrite old forecasts.</p>
-          </div>
-          <Link to="/predictions/archive" className="btn btn-outline">Open the archive <ArrowRight size={16} /></Link>
-        </div>
-        <div className="card archive-card">
-          <div className="table-scroll">
-            <table className="dtable cards-sm">
-              <thead><tr><th>Match</th><th>Market</th><th>Model probability</th><th>Result</th><th>Outcome</th><th>Type</th></tr></thead>
-              <tbody>
-                {items.length === 0 && Array.from({ length: 4 }, (_, i) => <tr key={i}><td colSpan={6}><Skeleton h={18} /></td></tr>)}
-                {items.map((r) => (
-                  <tr key={r.id}>
-                    <td data-label="Match"><strong>{r.home}</strong> <span className="muted">vs</span> <strong>{r.away}</strong><div className="tiny muted">{r.competition} · {longDate(r.starts_at_utc)}</div></td>
-                    <td data-label="Market">{r.market_label.replace("Total goals: ", "")}</td>
-                    <td data-label="Model" className="num"><span className="conf-cell"><ProbBar p={r.probability} width={70} /> {pct(r.probability)}</span></td>
-                    <td data-label="Result" className="num">{r.home_goals}-{r.away_goals}</td>
-                    <td data-label="Outcome">{r.settled_outcome === 1 ? <span className="pill pill-green">Happened</span> : <span className="pill pill-gray">Did not happen</span>}</td>
-                    <td data-label="Type">{r.is_pre_kickoff ? <span className="pill pill-blue">Published pre-kickoff</span> : <span className="pill pill-demo">Backtest{r.is_synthetic ? " · synthetic" : ""}</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="tiny muted archive-note">A 70% forecast should fail about 3 times in 10. Judge models on calibration and log loss across many matches, never on single results.</p>
-        </div>
-      </div>
-    </section>
-  );
-}
+type ArchiveItem = { id: string; fixture_id: string; market_label: string; probability: number; settled_outcome: number | null; home: string; away: string; home_goals: number | null; away_goals: number | null; starts_at_utc: string; is_pre_kickoff: boolean; is_synthetic: boolean; competition: string };
 
-function HowItWorks() {
-  const steps = [
-    { Icon: Database, title: "Sourced records", text: "Fixtures, scores and match statistics from a licensed provider, each stamped with source and time. Synthetic data is always labelled." },
-    { Icon: Sigma, title: "Independent models", text: "Dixon-Coles goal model, negative-binomial corners and cards models, fitted only on data available before kick-off." },
-    { Icon: Gauge, title: "Uncertainty & quality", text: "Each probability carries an uncertainty range and a quality label. Too little data means no number, not a guess." },
-    { Icon: FileSearch, title: "Traceable evidence", text: "Open any market to see the prior fixtures, hit-rates, distributions and model drivers behind it." },
+/** Dark showcase: what a credit unlocks, with a live preview built from the free sample report. */
+function ReportShowcase() {
+  const board = useTodayBoard();
+  const sample = board.data?.items.find((f) => f.is_public_sample);
+  const { data: r } = useApi<Report>(sample ? `/fixtures/${encodeURIComponent(sample.id)}/report` : null, { ttlMs: 300_000 });
+  const get = (id: string) => r?.markets.find((m) => m.id === id);
+  const rows: Array<[string, string]> = [
+    ["TOTAL_GOALS_OVER_2_5_REGULATION", "Over 2.5 goals"],
+    ["BTTS_YES_REGULATION", "Both teams to score"],
+    ["TOTAL_CORNERS_OVER_9_5_REGULATION", "Over 9.5 corners"],
+    ["TOTAL_YELLOW_CARDS_OVER_3_5_REGULATION", "Over 3.5 yellow cards"],
   ];
   return (
-    <section className="section how" aria-labelledby="how-title">
-      <div className="container">
-        <span className="eyebrow">Method</span>
-        <h2 id="how-title" className="h-section">How the probabilities are computed</h2>
-        <div className="grid-4 how-grid">
-          {steps.map(({ Icon, title, text }, i) => (
-            <div key={title} className="card card-pad how-step">
-              <span className="how-num">{i + 1}</span>
-              <Icon size={26} color="#067a3e" aria-hidden="true" />
-              <h3 className="h-card">{title}</h3>
-              <p className="muted small">{text}</p>
-            </div>
-          ))}
+    <section className="showcase" aria-labelledby="showcase-title">
+      <div className="container showcase-grid">
+        <div className="showcase-copy">
+          <span className="eyebrow eyebrow-dark">Full match report</span>
+          <h2 id="showcase-title">Every market. Every number backed by real matches.</h2>
+          <ul className="showcase-points">
+            <li><Check size={18} strokeWidth={3} /> 50+ markets per match: result, goals, BTTS, corners, cards</li>
+            <li><Check size={18} strokeWidth={3} /> The previous fixtures behind every probability</li>
+            <li><Check size={18} strokeWidth={3} /> Honest uncertainty ranges, never “sure wins”</li>
+          </ul>
+          {sample && (
+            <Link to={`/matches/${encodeURIComponent(sample.id)}`} className="btn btn-primary btn-lg">
+              Open a free sample report <ArrowRight size={18} />
+            </Link>
+          )}
         </div>
-        <Link to="/research/how-it-works" className="link">Read the full methodology <ArrowRight size={16} /></Link>
-      </div>
-    </section>
-  );
-}
-
-function SampleAnalysis() {
-  const { data } = useTodayBoard();
-  const sample = data?.items.find((f) => f.is_public_sample) ?? data?.items[0];
-  return (
-    <section className="section sample" aria-labelledby="sample-title">
-      <div className="container sample-grid">
-        <div>
-          <span className="eyebrow">Free sample</span>
-          <h2 id="sample-title" className="h-section">See a complete match report before you join</h2>
-          <p className="lede">One fixture is always open as a free sample: every supported market, the evidence tables and the model details. Exactly what a report credit unlocks.</p>
-          <div className="row-wrap" style={{ marginTop: 18 }}>
-            {sample && <Link to={`/matches/${encodeURIComponent(sample.id)}`} className="btn btn-dark">Open the free sample report <ArrowRight size={16} /></Link>}
-            <Link to="/research/how-it-works" className="btn btn-outline">What&apos;s inside a report</Link>
-          </div>
-        </div>
-        <div className="card sample-card" aria-hidden={!sample}>
-          {sample ? (
+        <div className="report-preview">
+          {sample && r ? (
             <>
-              <div className="sample-teams">
-                <span><TeamBadge team={sample.home} size={36} /> {sample.home.name}</span>
-                <span className="muted small">vs</span>
-                <span><TeamBadge team={sample.away} size={36} /> {sample.away.name}</span>
+              <div className="rp-head">
+                <span className="rp-team"><TeamBadge team={sample.home} size={34} /> {sample.home.name}</span>
+                <span className="rp-time num">{kickoffTime(sample.starts_at_utc)}</span>
+                <span className="rp-team rp-away">{sample.away.name} <TeamBadge team={sample.away} size={34} /></span>
               </div>
-              <div className="sample-rows">
-                {[
-                  { k: "Featured market", v: sample.featured?.short_label ?? "-" },
-                  { k: "Model probability", v: pct(sample.featured?.probability) },
-                  { k: "Markets in report", v: "56 defined · quality-gated" },
-                  { k: "Evidence sets", v: "Home, away, last 10, H2H, league" },
-                ].map((r) => (
-                  <div key={r.k} className="sample-row"><span className="muted">{r.k}</span><strong>{r.v}</strong></div>
+              <div className="rp-1x2">
+                {(["MATCH_RESULT_HOME_REGULATION", "MATCH_RESULT_DRAW_REGULATION", "MATCH_RESULT_AWAY_REGULATION"] as const).map((id, i) => (
+                  <div key={id} className="rp-1x2-cell">
+                    <span>{i === 0 ? "Home" : i === 1 ? "Draw" : "Away"}</span>
+                    <strong className="num">{pct(get(id)?.probability)}</strong>
+                  </div>
                 ))}
               </div>
-              {sample.is_synthetic && <DemoPill />}
+              <ul className="rp-markets">
+                {rows.map(([id, label]) => {
+                  const m = get(id);
+                  return (
+                    <li key={id}>
+                      <span>{label}</span>
+                      <span className="rp-bar"><span style={{ width: `${(m?.probability ?? 0) * 100}%` }} /></span>
+                      <strong className="num">{pct(m?.probability)}</strong>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="rp-foot">
+                <span>{r.markets.filter((m) => m.probability != null).length} markets · evidence tables · model details</span>
+                {sample.is_synthetic && <DemoPill dark label="Synthetic" />}
+              </div>
             </>
           ) : (
-            <Skeleton h={180} />
+            <div className="rp-skeleton" />
           )}
         </div>
       </div>
@@ -400,20 +361,35 @@ function SampleAnalysis() {
   );
 }
 
-function Coverage() {
-  const { data } = useApi<{ items: Array<{ id: string; name: string; country: string; is_synthetic: boolean; completed: number; upcoming: number; rights_status: string }> }>("/competitions", { ttlMs: 120_000 });
+/** Settled forecasts as result cards (stored immutably, settled after the match). */
+function RecentResults() {
+  const { data } = useApi<{ items: ArchiveItem[] }>("/predictions/archive?settled=settled&market=TOTAL_GOALS_OVER_2_5_REGULATION", { ttlMs: 120_000 });
+  const items = data?.items.slice(0, 4) ?? [];
+  const synthetic = items.some((i) => i.is_synthetic);
+  const backtest = items.some((i) => !i.is_pre_kickoff);
   return (
-    <section className="section" aria-labelledby="coverage-title">
+    <section className="section results" aria-labelledby="results-title">
       <div className="container">
-        <span className="eyebrow">Coverage</span>
-        <h2 id="coverage-title" className="h-section">League coverage</h2>
-        <p className="lede">Coverage depends on what our data plan actually provides. We show what is loaded, never a blanket promise.</p>
-        <div className="coverage-grid">
-          {(data?.items ?? []).map((c) => (
-            <Link key={c.id} to={`/leagues/${encodeURIComponent(c.id)}`} className="card coverage-item">
-              <CompMark name={c.name} synthetic={c.is_synthetic} />
-              <span className="cov-name"><strong>{c.name}</strong><span className="tiny muted">{c.country}</span></span>
-              {c.is_synthetic ? <span className="pill pill-demo">Synthetic demo</span> : c.completed > 0 ? <span className="pill pill-green">Data loaded</span> : <span className="pill pill-gray">Awaiting provider data</span>}
+        <div className="section-head">
+          <div className="row-wrap">
+            <h2 id="results-title" className="h-section">Recent results vs forecasts</h2>
+            {(synthetic || backtest) && <DemoPill label={backtest ? "Synthetic backtest" : "Synthetic"} />}
+          </div>
+          <Link to="/predictions/archive" className="link">Full forecast archive <ArrowRight size={16} /></Link>
+        </div>
+        <div className="result-cards">
+          {items.length === 0 && Array.from({ length: 4 }, (_, i) => <Skeleton key={i} h={132} r={12} />)}
+          {items.map((r) => (
+            <Link key={r.id} to={`/matches/${encodeURIComponent(r.fixture_id)}`} className="card result-card">
+              <span className="tiny muted">{r.competition} · {longDate(r.starts_at_utc)}</span>
+              <span className="rc-match">
+                <span>{r.home}</span><strong className="num">{r.home_goals}</strong>
+                <span>{r.away}</span><strong className="num">{r.away_goals}</strong>
+              </span>
+              <span className="rc-foot">
+                <span className="small">{r.market_label.replace("Total goals: ", "")} · <strong className="num">{pct(r.probability)}</strong></span>
+                {r.settled_outcome === 1 ? <span className="pill pill-green">Happened</span> : <span className="pill pill-gray">Didn&apos;t happen</span>}
+              </span>
             </Link>
           ))}
         </div>
@@ -422,30 +398,17 @@ function Coverage() {
   );
 }
 
-function BetaPricing() {
+function BetaBand() {
+  const { me, config } = useAuth();
+  if (me?.user) return null;
   return (
-    <section className="section beta" aria-labelledby="beta-title">
-      <div className="container beta-grid">
+    <section className="container beta-band-wrap" aria-label="Join the beta">
+      <div className="beta-band">
         <div>
-          <span className="eyebrow">Beta</span>
-          <h2 id="beta-title" className="h-section">Free during the invite-only beta</h2>
-          <p className="lede">Five invited testers each receive ten report credits. One credit unlocks one match: every supported market, all evidence and later refreshes of that report. Reopening it never costs again.</p>
-          <ul className="beta-points">
-            <li><Check size={18} /> No card, no Mobile Money, no payments in the beta</li>
-            <li><Check size={18} /> A credit is one match report, never an API request</li>
-            <li><Check size={18} /> Pricing after the beta is still being tested, not final</li>
-          </ul>
-          <Link to="/pricing" className="btn btn-outline">Beta &amp; pricing details <ArrowRight size={16} /></Link>
+          <strong>Join the invite-only beta</strong>
+          <span>{config?.beta_initial_credits ?? 10} free full match reports. No card, no payment.</span>
         </div>
-        <div className="beta-cards">
-          {[
-            { n: "10", t: "free report credits per tester" },
-            { n: "1", t: "credit per match, all markets included" },
-            { n: "0", t: "charge for reopening or switching markets" },
-          ].map((x) => (
-            <div key={x.t} className="beta-stat"><strong className="num">{x.n}</strong><span>{x.t}</span></div>
-          ))}
-        </div>
+        <Link to="/join" className="btn btn-primary">Get Started <ArrowRight size={18} /></Link>
       </div>
     </section>
   );
@@ -453,15 +416,11 @@ function BetaPricing() {
 
 function ResponsibleBand() {
   return (
-    <section className="responsible" aria-labelledby="resp-title">
+    <section className="responsible" aria-label="Responsible use">
       <div className="container responsible-inner">
-        <Scale size={30} aria-hidden="true" />
-        <div>
-          <h2 id="resp-title">Research responsibly</h2>
-          <p>18+ only. Probabilities describe uncertainty; they do not predict certain outcomes or guarantee winnings. We never tell you what to bet. If gambling stops being fun, take a break and seek support.</p>
-        </div>
-        <Link to="/responsible-use" className="btn btn-outline-light">Responsible use <BookOpenCheck size={16} /></Link>
-        <Link to="/statistics" className="btn btn-outline-light only-desktop">Model limits <LineChart size={16} /></Link>
+        <Scale size={22} aria-hidden="true" />
+        <p><strong>18+ only. Research, not betting advice.</strong> Probabilities are uncertain and never guarantee a result.</p>
+        <Link to="/responsible-use" className="link-light">Responsible use <ArrowRight size={14} /></Link>
       </div>
     </section>
   );

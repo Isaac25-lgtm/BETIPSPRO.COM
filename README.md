@@ -76,7 +76,7 @@ echo VITE_LOCAL_REFERENCE_HERO=true > .env.local
 npm run dev
 ```
 
-Safeguards: the images go to `public/images/local/` (gitignored), the flag only works in `npm run dev`, and every production build deletes `images/local` automatically. Before any public launch, replace them with licensed photos and logos.
+Safeguards: the images go to `public/images/local/` (gitignored), the flag only works in `npm run dev`, and every production build deletes `images/local` automatically. The README screenshots above were taken in this preview mode at the owner's request. Before any public launch, make the repository private and replace these images with licensed photos and logos.
 
 ## How it works
 
@@ -152,7 +152,7 @@ Step-by-step guide: [docs/setup-free-api-football.md](docs/setup-free-api-footba
 
 ## Responsible use & compliance
 
-This is an **information and research** product for adults (18+). It does not take bets, hold money or tell anyone what to bet; probabilities are uncertain and never guarantee a result. The public codebase uses no club crests, league emblems or player photos; all shipped artwork is original (the local preview above is never published).
+This is an **information and research** product for adults (18+). It does not take bets, hold money or tell anyone what to bet; probabilities are uncertain and never guarantee a result. The shipped application uses no club crests, league emblems or player photos; all artwork in production builds is original. (README screenshots show the owner's local reference preview.)
 
 Before any public or paid launch, these gates remain open: brand/trademark, data-publishing rights, Ugandan regulatory classification, reviewed legal pages, and a licensed payment provider. See [release checklist](docs/release-checklist.md) and [licensing & compliance](docs/licensing-and-compliance.md).
 

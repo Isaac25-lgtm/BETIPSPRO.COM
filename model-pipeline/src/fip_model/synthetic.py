@@ -90,6 +90,17 @@ PLAYED_ROUNDS_CURRENT = 10
 UPCOMING_ROUNDS = 2
 
 
+GENERIC_WORDS = {"FC", "CF", "SD", "UD", "CD", "SK", "AC", "AS", "United", "Athletic", "Rovers", "Rangers", "Wanderers",
+                 "Town", "City", "Harriers", "Albion", "Real", "Atletico", "Deportivo", "Sporting", "Racing", "Union",
+                 "Dynamo", "Olympic", "Inter", "Rapid"}
+
+
+def short_name(name: str) -> str:
+    """Distinctive short label for tables ("Northbridge Rovers" -> "Northbridge", "Kestrel Bay FC" -> "Kestrel Bay")."""
+    words = [w for w in name.split() if w not in GENERIC_WORDS]
+    return " ".join(words) if words else name
+
+
 @dataclass
 class World:
     competitions: list[dict]
@@ -164,7 +175,7 @@ def generate(anchor: datetime, seed: int = 20261020) -> World:
                     "provider": "demo",
                     "provider_id": f"{comp['provider_id']}-t{i + 1:02d}",
                     "name": name,
-                    "short_name": name.split(" ")[-1] if len(name) > 14 else name,
+                    "short_name": short_name(name),
                     "code": code,
                     "country": "Synthetic (demo)",
                     "primary_color": c1,

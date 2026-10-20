@@ -1,12 +1,12 @@
 import { Link } from "react-router";
 import {
-  ArrowRight, BarChart3, CalendarDays, Check, ChevronRight, Crown, Layers, Scale, ShieldCheck, Trophy, Zap,
+  ArrowRight, BarChart3, CalendarDays, Check, ChevronRight, Crown, FileText, Layers, Scale, ShieldCheck, Trophy,
 } from "lucide-react";
 import { useAuth } from "../app/auth";
 import { useApi } from "../lib/api";
 import { kickoffTime, longDate, odds, pct, eatYmd } from "../lib/format";
 import type { FixtureList, FixtureSummary, Report } from "../lib/types";
-import { CompMark, DemoPill, ErrorState, ProbBar, Skeleton, TeamBadge } from "../components/ui";
+import { CompMark, DemoPill, ErrorState, ProbBar, Skeleton, TeamBadge, teamLabel } from "../components/ui";
 
 /**
  * LOCAL-ONLY preview hero cut from the owner's reference screenshot (real players + sponsor logos).
@@ -78,7 +78,7 @@ function Hero() {
           <li><span className="fs-icon"><BarChart3 size={26} strokeWidth={2.4} /></span><span>Data-Driven<br />Analysis</span></li>
           <li><span className="fs-icon"><ShieldCheck size={26} strokeWidth={2.2} /></span><span>Evidence-Based<br />Insights</span></li>
           <li><span className="fs-icon"><Trophy size={26} strokeWidth={2.2} /></span><span>Major Leagues<br />&amp; Markets</span></li>
-          <li><span className="fs-icon"><Zap size={26} strokeWidth={2.2} /></span><span>Research<br />Tools</span></li>
+          <li><span className="fs-icon"><FileText size={26} strokeWidth={2.2} /></span><span>Full Match<br />Reports</span></li>
         </ul>
       </div>
     </section>
@@ -182,10 +182,10 @@ function InsightRow({ f }: { f: FixtureSummary }) {
       <td>
         <Link to={to} className="match-cell">
           <TeamBadge team={f.home} size={32} />
-          <span className="team-name">{f.home.name}</span>
+          <span className="team-name" title={f.home.name}>{teamLabel(f.home)}</span>
           <span className="vs">vs</span>
           <TeamBadge team={f.away} size={32} />
-          <span className="team-name">{f.away.name}</span>
+          <span className="team-name" title={f.away.name}>{teamLabel(f.away)}</span>
         </Link>
       </td>
       <td className="market-cell"><Link to={to}>{f.featured?.short_label}</Link></td>
@@ -216,8 +216,8 @@ function InsightCard({ f }: { f: FixtureSummary }) {
           <span className="num ic-time">{kickoffTime(f.starts_at_utc)}</span>
         </div>
         <div className="ic-teams">
-          <span><TeamBadge team={f.home} size={26} /> {f.home.name}</span>
-          <span><TeamBadge team={f.away} size={26} /> {f.away.name}</span>
+          <span><TeamBadge team={f.home} size={26} /> {teamLabel(f.home, 22)}</span>
+          <span><TeamBadge team={f.away} size={26} /> {teamLabel(f.away, 22)}</span>
         </div>
         <div className="ic-market">
           <span className="ic-label">{f.featured?.short_label}</span>
@@ -344,9 +344,9 @@ function ReportShowcase() {
           {sample && r ? (
             <>
               <div className="rp-head">
-                <span className="rp-team"><TeamBadge team={sample.home} size={34} /> {sample.home.name}</span>
+                <span className="rp-team"><TeamBadge team={sample.home} size={34} /> {teamLabel(sample.home, 14)}</span>
                 <span className="rp-time num">{kickoffTime(sample.starts_at_utc)}</span>
-                <span className="rp-team rp-away">{sample.away.name} <TeamBadge team={sample.away} size={34} /></span>
+                <span className="rp-team rp-away">{teamLabel(sample.away, 14)} <TeamBadge team={sample.away} size={34} /></span>
               </div>
               <div className="rp-1x2">
                 {(["MATCH_RESULT_HOME_REGULATION", "MATCH_RESULT_DRAW_REGULATION", "MATCH_RESULT_AWAY_REGULATION"] as const).map((id, i) => (

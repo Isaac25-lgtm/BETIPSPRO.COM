@@ -32,23 +32,38 @@ export function Logo({ compact = false, dark = true }: { compact?: boolean; dark
   );
 }
 
-/** Original monogram badge from team colours. No club crests are used (rights not cleared). */
+/** Clean circular monogram from team colours. No club crests are used (rights not cleared). */
 export function TeamBadge({ team, size = 32 }: { team: Pick<TeamRef, "name" | "primary_color" | "secondary_color" | "code">; size?: number }) {
   const c1 = team.primary_color ?? "#334155";
   const c2 = team.secondary_color ?? "#ffffff";
   const light = isLight(c1);
+  const ink = light ? "#0f172a" : isLight(c2) ? c2 : "#ffffff";
+  const id = `tb-${(team.code ?? team.name).replace(/[^a-z0-9]/gi, "")}`;
+  const label = (team.code ?? initials(team.name)).slice(0, 3).toUpperCase();
   return (
-    <span className="team-badge" style={{ width: size, height: size, fontSize: size * 0.34 }} aria-hidden="true">
+    <span className="team-badge" style={{ width: size, height: size }} aria-hidden="true">
       <svg viewBox="0 0 32 32" width={size} height={size}>
-        <path d="M16 2.5 28 6.5v8.8c0 7.2-5 12.4-12 14.4C9 27.7 4 22.5 4 15.3V6.5Z" fill={c1} stroke={light ? "#cbd5e1" : c1} strokeWidth="1" />
-        <path d="M16 2.5 28 6.5v8.8c0 1-.1 2-.3 2.9H4.3C4.1 17.3 4 16.3 4 15.3V6.5Z" fill="#000" opacity=".08" />
-        <rect x="4.5" y="20.5" width="23" height="2.4" fill={c2} opacity=".9" />
-        <text x="16" y="17.2" textAnchor="middle" fontSize="10.5" fontWeight="800" fill={light ? "#0f172a" : c2 === c1 ? "#fff" : c2} fontFamily="Inter, sans-serif">
-          {team.code?.slice(0, 3) ?? initials(team.name)}
+        <defs>
+          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#fff" stopOpacity=".22" />
+            <stop offset=".55" stopColor="#fff" stopOpacity="0" />
+            <stop offset="1" stopColor="#000" stopOpacity=".18" />
+          </linearGradient>
+        </defs>
+        <circle cx="16" cy="16" r="15" fill={c1} />
+        <circle cx="16" cy="16" r="15" fill={`url(#${id})`} />
+        <circle cx="16" cy="16" r="13.2" fill="none" stroke={light ? "#94a3b8" : c2} strokeOpacity={light ? 0.5 : 0.75} strokeWidth="1.2" />
+        <text x="16" y={label.length > 2 ? 19.6 : 20.2} textAnchor="middle" fontSize={label.length > 2 ? 9.6 : 11.5} fontWeight="800" letterSpacing="-.3" fill={ink} fontFamily="Inter, sans-serif">
+          {label}
         </text>
       </svg>
     </span>
   );
+}
+
+/** Full name when it fits a compact cell, otherwise the provider/demo short name. */
+export function teamLabel(team: Pick<TeamRef, "name" | "short_name">, max = 16) {
+  return team.name.length <= max || !team.short_name ? team.name : team.short_name;
 }
 
 function isLight(hex: string) {

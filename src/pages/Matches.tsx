@@ -5,7 +5,7 @@ import { useAuth } from "../app/auth";
 import { useApi } from "../lib/api";
 import { addDays, eatYmd, kickoffDate, kickoffTime, pct, statusLabel, ymdLabel } from "../lib/format";
 import type { FixtureList, FixtureSummary } from "../lib/types";
-import { CompMark, DemoPill, EmptyState, ErrorState, ProbBar, Skeleton, TeamBadge } from "../components/ui";
+import { CompMark, DemoPill, EmptyState, ErrorState, ProbBar, Skeleton, TeamBadge, teamLabel } from "../components/ui";
 
 function useUnlockedSet() {
   const { me } = useAuth();
@@ -153,8 +153,8 @@ export function FixtureRow({ f, unlocked, showDate }: { f: FixtureSummary; unloc
           <span className={`fr-status ${finished ? "ft" : f.display_status === "AWAITING_RESULT" ? "await" : ""}`}>{finished ? "FT" : f.display_status === "AWAITING_RESULT" ? "Awaiting" : statusLabel(f.status) === "Not started" ? "" : statusLabel(f.status)}</span>
         </span>
         <span className="fr-teams">
-          <span className="fr-team"><TeamBadge team={f.home} size={24} /> <span>{f.home.name}</span>{finished && <strong className="fr-score num">{f.score.home}</strong>}</span>
-          <span className="fr-team"><TeamBadge team={f.away} size={24} /> <span>{f.away.name}</span>{finished && <strong className="fr-score num">{f.score.away}</strong>}</span>
+          <span className="fr-team"><TeamBadge team={f.home} size={24} /> <span title={f.home.name}>{teamLabel(f.home, 24)}</span>{finished && <strong className="fr-score num">{f.score.home}</strong>}</span>
+          <span className="fr-team"><TeamBadge team={f.away} size={24} /> <span title={f.away.name}>{teamLabel(f.away, 24)}</span>{finished && <strong className="fr-score num">{f.score.away}</strong>}</span>
         </span>
         <span className="fr-featured">
           {f.featured ? (

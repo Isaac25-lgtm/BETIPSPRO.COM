@@ -331,3 +331,27 @@ a.market-row:hover { background: #f6f9fb; }
 .date-scroller, .filter-row > *, .ev-grid > *, .match-grid > *, .centre-grid > *, .account > * { min-width: 0; }
 
 .match-toolbar { grid-template-columns: minmax(0, 1fr); }
+
+/* ================================================================ stadium headers (aesthetic pass) */
+.match-header {
+  position: relative; overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(0,20,36,.96) 0%, rgba(0,20,36,.86) 40%, rgba(0,20,36,.6) 100%),
+    url(/images/hero-desktop-1600.webp) 85% 40% / cover no-repeat, #001424;
+}
+.match-header::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(29,249,146,.7), transparent); }
+.mh-team .team-badge { filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+.mh-time, .mh-score { text-shadow: 0 2px 20px rgba(0,0,0,.4); }
+.evidence-page { padding-top: 16px; }
+.ev-hero {
+  position: relative; overflow: hidden; margin-bottom: 14px; padding: 18px 22px 20px; border-radius: 16px; color: #fff;
+  background:
+    linear-gradient(90deg, rgba(0,20,36,.96) 0%, rgba(0,20,36,.85) 50%, rgba(0,20,36,.55) 100%),
+    url(/images/hero-desktop-1600.webp) 85% 40% / cover no-repeat, #001424;
+  box-shadow: var(--shadow-card);
+}
+.ev-hero .breadcrumbs, .ev-hero .breadcrumbs a { color: #9fb3c8; }
+.ev-hero .ev-head { margin-bottom: 0; }
+.ev-hero .ev-head h1 { color: #fff; }
+.ev-hero .ev-head .muted { color: #b8c7d6; }
+@media (max-width: 600px) { .ev-hero { padding: 14px 16px 16px; border-radius: 12px; } }

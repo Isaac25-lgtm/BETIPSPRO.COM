@@ -48,7 +48,9 @@ export function statusLabel(s: string) {
 }
 
 export function initials(name: string) {
-  const parts = name.replace(/\b(FC|CF|SD|UD|CD|SK|AC|AS)\b/g, "").trim().split(/\s+/);
+  const generic = /\b(FC|CF|SD|UD|CD|SK|AC|AS|United|Athletic|Rovers|Rangers|Wanderers|Town|City|Harriers|Albion)\b/g;
+  const parts = name.replace(generic, "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return name.slice(0, 2).toUpperCase();
   return (parts.length > 1 ? parts[0][0] + parts[1][0] : parts[0].slice(0, 2)).toUpperCase();
 }
 

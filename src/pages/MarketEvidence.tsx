@@ -33,6 +33,7 @@ export default function MarketEvidence() {
 
   return (
     <div className="container evidence-page">
+      <div className="ev-hero">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
         <Link to={`/matches/${fid}`}><ArrowLeft size={13} style={{ display: "inline", verticalAlign: "-2px" }} /> {e.fixture.home} vs {e.fixture.away}</Link>
         <span>/</span><span>{e.market.category}</span>
@@ -44,6 +45,7 @@ export default function MarketEvidence() {
         </div>
         <QualityPill status={f.status} />
       </header>
+      </div>
       {e.display_notice && <Notice tone="demo"><strong>{e.display_notice}.</strong> All matches, teams and figures below are fictional.</Notice>}
 
       {siblings.length > 1 && (

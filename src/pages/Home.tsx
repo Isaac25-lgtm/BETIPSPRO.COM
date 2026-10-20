@@ -8,6 +8,13 @@ import { kickoffTime, longDate, odds, pct, eatYmd } from "../lib/format";
 import type { FixtureList, FixtureSummary, Report } from "../lib/types";
 import { CompMark, DemoPill, ErrorState, ProbBar, Skeleton, TeamBadge } from "../components/ui";
 
+/**
+ * LOCAL-ONLY preview hero cut from the owner's reference screenshot (real players + sponsor logos).
+ * Enabled only in `vite dev` with VITE_LOCAL_REFERENCE_HERO=true in .env.local; the images are
+ * gitignored and stripped from production builds. Replace with a licensed photo before launch.
+ */
+const LOCAL_REFERENCE_HERO = import.meta.env.DEV && import.meta.env.VITE_LOCAL_REFERENCE_HERO === "true";
+
 export default function Home() {
   return (
     <div className="home">
@@ -34,9 +41,18 @@ function Hero() {
   const { config } = useAuth();
   return (
     <section className="hero" aria-labelledby="hero-title">
-      <picture className="hero-art">
-        <source media="(max-width: 767px)" srcSet="/images/hero-mobile-800.webp 800w, /images/hero-mobile-1200.webp 1200w" sizes="100vw" />
-        <img src="/images/hero-desktop-1600.webp" srcSet="/images/hero-desktop-1600.webp 1600w, /images/hero-desktop-2400.webp 2400w, /images/hero-desktop-3200.webp 3200w" sizes="100vw" alt="" fetchPriority="high" decoding="async" width={1600} height={415} />
+      <picture className={`hero-art ${LOCAL_REFERENCE_HERO ? "hero-art-local" : ""}`}>
+        {LOCAL_REFERENCE_HERO ? (
+          <>
+            <source media="(max-width: 767px)" srcSet="/images/local/hero-mobile-800.webp" />
+            <img src="/images/local/hero-desktop-1600.webp" srcSet="/images/local/hero-desktop-1600.webp 1600w, /images/local/hero-desktop-2400.webp 2400w" sizes="100vw" alt="" fetchPriority="high" decoding="async" width={1600} height={415} />
+          </>
+        ) : (
+          <>
+            <source media="(max-width: 767px)" srcSet="/images/hero-mobile-800.webp 800w, /images/hero-mobile-1200.webp 1200w" sizes="100vw" />
+            <img src="/images/hero-desktop-1600.webp" srcSet="/images/hero-desktop-1600.webp 1600w, /images/hero-desktop-2400.webp 2400w, /images/hero-desktop-3200.webp 3200w" sizes="100vw" alt="" fetchPriority="high" decoding="async" width={1600} height={415} />
+          </>
+        )}
       </picture>
       <div className="hero-overlay" />
       <div className="container hero-inner">
@@ -225,9 +241,14 @@ function LeagueTiles() {
   return (
     <section className="league-tiles" aria-label="League hubs">
       {LEAGUES.map(({ id, title, text, cta, img, Icon }) => (
-        <Link key={id} to={`/leagues/${encodeURIComponent(id)}`} className="league-tile" style={{ backgroundImage: `url(${img})` }}>
+        <Link
+          key={id}
+          to={`/leagues/${encodeURIComponent(id)}`}
+          className={`league-tile ${LOCAL_REFERENCE_HERO ? "league-tile-local" : ""}`}
+          style={{ backgroundImage: `url(${LOCAL_REFERENCE_HERO ? img.replace("/images/", "/images/local/") : img})` }}
+        >
           <span className="lt-inner">
-            <span className="lt-icon" aria-hidden="true"><Icon size={46} strokeWidth={1.6} /></span>
+            <span className="lt-icon" aria-hidden="true">{!LOCAL_REFERENCE_HERO && <Icon size={46} strokeWidth={1.6} />}</span>
             <span className="lt-body">
               <span className="lt-title">{title}</span>
               <span className="lt-text">{text}</span>

@@ -1,12 +1,21 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { cloudflare } from "@cloudflare/vite-plugin";
+import { rmSync } from "node:fs";
+
+// Never ship the local-only reference hero (real players / sponsor logos) in any build.
+const stripLocalOnlyAssets = {
+  name: "strip-local-only-assets",
+  closeBundle() {
+    rmSync("dist/client/images/local", { recursive: true, force: true });
+  },
+};
 
 // One deployable unit: the React SPA is served as Worker static assets and
 // /api/* is handled by the Worker (see wrangler.jsonc run_worker_first).
 export default defineConfig({
   // FIP_PERSIST lets E2E runs use an isolated local D1 state directory.
-  plugins: [react(), cloudflare(process.env.FIP_PERSIST ? { persistState: { path: process.env.FIP_PERSIST } } : {})],
+  plugins: [react(), stripLocalOnlyAssets, cloudflare(process.env.FIP_PERSIST ? { persistState: { path: process.env.FIP_PERSIST } } : {})],
   build: {
     target: "es2022",
     cssCodeSplit: true,

@@ -21,3 +21,6 @@ __pycache__/
 .pytest_cache/
 # The owner-supplied reference screenshot stays local unless the owner approves committing it.
 design/reference/homepage-reference.png
+
+# Local-only hero built from the owner reference screenshot (real players/sponsors) - never commit.
+public/images/local/

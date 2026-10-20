@@ -64,6 +64,20 @@ Testers open `/join`, enter their invite code, the invited email and a password,
 
 > Demo fixtures are re-anchored to "today" (Uganda time) when the database is seeded. On a later day, run `npm run db:reset` to refresh them.
 
+## Local reference preview (owner's machine only)
+
+The owner's reference design uses photos of real players and official league emblems. These **cannot ship publicly** without licences, so the repository contains original artwork only. To preview the site exactly like the reference on your own machine:
+
+```bash
+# needs design/reference/homepage-reference.png (kept out of Git)
+python design/scripts/render_local_hero.py     # hero with the reference players
+python design/scripts/render_local_tiles.py    # league tiles with official emblems (text removed)
+echo VITE_LOCAL_REFERENCE_HERO=true > .env.local
+npm run dev
+```
+
+Safeguards: the images go to `public/images/local/` (gitignored), the flag only works in `npm run dev`, and every production build deletes `images/local` automatically. Before any public launch, replace them with licensed photos and logos.
+
 ## How it works
 
 ```
@@ -94,6 +108,7 @@ More detail: [technical architecture](docs/technical-architecture.md) · [databa
 | `npm run test:load` | Local load matrix (1 / 5 / 25 / 100 / 500 users) after `npm run build` |
 | `npm run model:test` · `npm run model:demo` | Model invariant tests · regenerate the synthetic artifact |
 | `node scripts/import-artifact.mjs` | Import a real-data model run through the admin API |
+| `node scripts/readme-screenshots.mjs` | Regenerate the README screenshots (run with the local preview flag off) |
 
 ## Project structure
 
@@ -119,6 +134,7 @@ docs/             Decisions, status, runbooks, compliance and setup guides
 | Credit concurrency | no double-charges under parallel unlocks or a 500-user storm |
 | Provider budget | hard caps enforced atomically; cached report views make 0 upstream calls |
 | Load (one local process) | 0% errors up to 100 concurrent users; 500 users **not yet demonstrated** |
+| Layout | No horizontal overflow at 320 – 1536 px; touch targets ≥ 44 px |
 
 Full status, known limitations and the acceptance checklist are in [docs/status.md](docs/status.md).
 
@@ -136,7 +152,7 @@ Step-by-step guide: [docs/setup-free-api-football.md](docs/setup-free-api-footba
 
 ## Responsible use & compliance
 
-This is an **information and research** product for adults (18+). It does not take bets, hold money or tell anyone what to bet; probabilities are uncertain and never guarantee a result. No club crests, league emblems or player photos are used; all artwork is original.
+This is an **information and research** product for adults (18+). It does not take bets, hold money or tell anyone what to bet; probabilities are uncertain and never guarantee a result. The public codebase uses no club crests, league emblems or player photos; all shipped artwork is original (the local preview above is never published).
 
 Before any public or paid launch, these gates remain open: brand/trademark, data-publishing rights, Ugandan regulatory classification, reviewed legal pages, and a licensed payment provider. See [release checklist](docs/release-checklist.md) and [licensing & compliance](docs/licensing-and-compliance.md).
 

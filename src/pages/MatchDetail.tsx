@@ -6,7 +6,7 @@ import { api, ApiError, idempotencyKey, invalidate, useApi } from "../lib/api";
 import { dateTime, kickoffTime, longDate, metricLabels, odds, pct, statusLabel, utcTime } from "../lib/format";
 import type { FormEntry, Preview, Report, ReportMarket } from "../lib/types";
 import { DemoPill, ErrorState, LockedValue, Notice, ProbBar, QualityPill, Skeleton, TeamBadge, teamLabel } from "../components/ui";
-import { FormStrip, PmfBars, ScorelineHeatmap } from "../components/charts";
+import { BaseRateComparison, FormStrip, FormTimeline, PmfBars, ScorelineHeatmap, TotalGoalsChart } from "../components/charts";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -229,6 +229,21 @@ function LockedView({ p, tab, reason, onUnlocked }: { p: Preview; tab: TabId; re
 
 // ---------------------------------------------------------------- full report
 
+const BASE_MARKETS: Array<[string, string]> = [
+  ["MATCH_RESULT_HOME_REGULATION", "Home win"], ["MATCH_RESULT_DRAW_REGULATION", "Draw"], ["MATCH_RESULT_AWAY_REGULATION", "Away win"],
+  ["TOTAL_GOALS_OVER_1_5_REGULATION", "Over 1.5 goals"], ["TOTAL_GOALS_OVER_2_5_REGULATION", "Over 2.5 goals"], ["TOTAL_GOALS_OVER_3_5_REGULATION", "Over 3.5 goals"],
+  ["BTTS_YES_REGULATION", "Both teams score"], ["FIRST_HALF_GOALS_OVER_0_5", "Goal before half-time"],
+];
+
+function baseRows(r: Report) {
+  const base = r.summary.baselines ?? {};
+  const by = new Map(r.markets.map((m) => [m.id, m.probability]));
+  return BASE_MARKETS.flatMap(([id, label]) => {
+    const model = by.get(id), b = base[id];
+    return model != null && b != null ? [{ label, model, base: b }] : [];
+  });
+}
+
 function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; setTab: (t: TabId) => void }) {
   const f = p.fixture;
   const by = useMemo(() => new Map(r.markets.map((m) => [m.id, m])), [r]);
@@ -259,6 +274,9 @@ function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; 
                 })}
               </div>
             </section>
+            {baseRows(r).length > 0 && (
+              <section className="card card-pad"><BaseRateComparison rows={baseRows(r)} title="Model vs league average" /></section>
+            )}
             <section className="card card-pad">
               <h2 className="h-card">Key markets</h2>
               <MarketList markets={["TOTAL_GOALS_OVER_2_5_REGULATION", "TOTAL_GOALS_UNDER_2_5_REGULATION", "BTTS_YES_REGULATION", "DOUBLE_CHANCE_HOME_DRAW_REGULATION", "TOTAL_CORNERS_OVER_9_5_REGULATION", "TOTAL_YELLOW_CARDS_OVER_3_5_REGULATION"].map(get).filter(Boolean) as ReportMarket[]} fixtureId={f.id} />
@@ -282,6 +300,7 @@ function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; 
         {tab === "goals" && (
           <>
             {r.analysis.scoreline_matrix && <section className="card card-pad"><ScorelineHeatmap matrix={r.analysis.scoreline_matrix} home={f.home.name} away={f.away.name} title="Scoreline distribution (model)" /></section>}
+            {r.analysis.scoreline_matrix && <section className="card card-pad"><TotalGoalsChart matrix={r.analysis.scoreline_matrix} title="Total goals in the match (model)" /></section>}
             <section className="card card-pad">
               <h2 className="h-card">Goal thresholds</h2>
               <MarketList markets={r.markets.filter((m) => ["TOTAL_GOALS", "BTTS", "TEAM_GOALS"].includes(m.family))} fixtureId={f.id} />
@@ -307,6 +326,7 @@ function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; 
         )}
         {tab === "form" && (
           <>
+            {(r.form.home.length > 0 || r.form.away.length > 0) && <section className="card card-pad"><FormTimeline home={f.home.name} away={f.away.name} form={r.form} /></section>}
             <FormSection home={f.home.name} away={f.away.name} form={r.form} />
             <section className="card card-pad">
               <h2 className="h-card">Head-to-head</h2>

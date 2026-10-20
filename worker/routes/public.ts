@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cached } from "../services/cache.ts";
 import { z } from "zod";
 import type { AppBindings } from "../env.ts";
 import { dataMode, flag, num } from "../env.ts";
@@ -14,9 +15,12 @@ const PUBLIC_CACHE = "public, max-age=30, s-maxage=60, stale-while-revalidate=12
 export const publicRoutes = new Hono<AppBindings>();
 
 // Shared response cache for user-independent reads (never for reports, evidence, /me or admin).
-for (const path of ["/config/public", "/competitions", "/competitions/:id", "/fixtures", "/fixtures/:id/preview", "/fixtures/:id/markets", "/markets/catalog", "/statistics/models", "/predictions/archive", "/plans"]) {
-  publicRoutes.use(path, publicCache(path === "/config/public" ? 300 : 60));
-}
+// TTLs: data only changes on an admin import, so slow-moving aggregates cache for 5 minutes.
+const CACHE_TTL: Record<string, number> = {
+  "/config/public": 300, "/competitions": 300, "/competitions/:id": 300, "/markets/catalog": 3600, "/statistics/models": 300,
+  "/predictions/archive": 300, "/plans": 3600, "/fixtures": 60, "/fixtures/:id/preview": 120, "/fixtures/:id/markets": 300,
+};
+for (const [path, ttl] of Object.entries(CACHE_TTL)) publicRoutes.use(path, publicCache(ttl));
 
 publicRoutes.get("/health", async (c) => {
   const t0 = Date.now();
@@ -100,7 +104,12 @@ publicRoutes.get("/fixtures", async (c) => {
   return ok(c, data, { cache: PUBLIC_CACHE, meta: { data_mode: dataMode(c.env) } });
 });
 
-publicRoutes.get("/reports/overview", async (c) => ok(c, await reportOverview(c.env), { cache: PUBLIC_CACHE }));
+// Cached per access state (not in the shared cache), so switching open access off hides probabilities at once.
+publicRoutes.get("/reports/overview", async (c) => {
+  const open = await openAccess(c.env);
+  const { value } = await cached(`overview:${open ? "open" : "locked"}`, 120, () => reportOverview(c.env));
+  return ok(c, value, { cache: "private, max-age=30" });
+});
 
 publicRoutes.get("/fixtures/:id/preview", async (c) => ok(c, await fixturePreview(c.env, c.req.param("id")), { cache: PUBLIC_CACHE }));
 

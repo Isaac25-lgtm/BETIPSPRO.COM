@@ -197,3 +197,103 @@ export function FormStrip({ results }: { results: Array<"W" | "D" | "L"> }) {
     </span>
   );
 }
+
+/** Model vs league base rate for key markets: one row per market, two dots on a 0-100% track. */
+export function BaseRateComparison({ rows, title }: { rows: Array<{ label: string; model: number; base: number }>; title: string }) {
+  const { bind, node } = useTip();
+  const sorted = [...rows].sort((a, b) => Math.abs(b.model - b.base) - Math.abs(a.model - a.base));
+  return (
+    <figure className="chart dumbbell">
+      <figcaption className="chart-title">{title}</figcaption>
+      <div className="db-legend"><span><i className="db-dot base" />League average</span><span><i className="db-dot up" />Model higher</span><span><i className="db-dot down" />Model lower</span></div>
+      <div className="db-rows" role="list">
+        {sorted.map((r) => {
+          const lo = Math.min(r.model, r.base), hi = Math.max(r.model, r.base);
+          const dir = r.model >= r.base ? "up" : "down";
+          const diff = Math.round((r.model - r.base) * 100);
+          return (
+            <div key={r.label} className="db-row" role="listitem" {...bind(<><strong>{r.label}</strong><br />Model {pc(r.model, 0)} · league {pc(r.base, 0)} ({diff >= 0 ? "+" : ""}{diff} pts)</>)}>
+              <span className="db-label">{r.label}</span>
+              <span className="db-track">
+                {[25, 50, 75].map((g) => <i key={g} className="db-grid" style={{ left: `${g}%` }} />)}
+                <i className={`db-span ${dir}`} style={{ left: `${lo * 100}%`, width: `${Math.max((hi - lo) * 100, 0.6)}%` }} />
+                <i className="db-dot base" style={{ left: `${r.base * 100}%` }} />
+                <i className={`db-dot ${dir}`} style={{ left: `${r.model * 100}%` }} />
+              </span>
+              <span className={`db-val num ${dir}`}>{pc(r.model, 0)}<small>{diff >= 0 ? "+" : ""}{diff}</small></span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="db-axis" aria-hidden="true"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+      {node}
+    </figure>
+  );
+}
+
+/** Total goals in the match (0..6+) from the scoreline matrix, split at the 2.5 line. */
+export function TotalGoalsChart({ matrix, title }: { matrix: number[][]; title: string }) {
+  const { bind, node } = useTip();
+  const n = matrix.length;
+  const totals = Array.from({ length: 7 }, () => 0);
+  matrix.forEach((row, h) => row.forEach((v, a) => { totals[Math.min(h + a, 6)] += v; }));
+  const max = Math.max(...totals);
+  const under = totals[0] + totals[1] + totals[2];
+  const exp = matrix.reduce((s, row, h) => s + row.reduce((t, v, a) => t + v * (h + a), 0), 0);
+  return (
+    <figure className="chart goals-dist">
+      <figcaption className="chart-title">{title}</figcaption>
+      <div className="gd-summary">
+        <span><b className="num">{pc(under, 0)}</b> under 2.5</span>
+        <span><b className="num">{pc(1 - under, 0)}</b> over 2.5</span>
+        <span><b className="num">{exp.toFixed(1)}</b> goals expected{n <= 7 ? " (6+ grouped)" : ""}</span>
+      </div>
+      <div className="gd-bars" role="img" aria-label={`${title}: ${totals.map((v, i) => `${i === 6 ? "6+" : i} goals ${pc(v, 0)}`).join(", ")}`}>
+        {totals.map((v, i) => (
+          <div key={i} className={`gd-col ${i <= 2 ? "under" : "over"}`} {...bind(<><strong>{i === 6 ? "6 or more" : i} goal{i === 1 ? "" : "s"}</strong><br />Model probability {pc(v)}</>)}>
+            <span className="gd-pct num">{pc(v, 0)}</span>
+            <span className="gd-bar" style={{ height: `${(v / max) * 100}%` }} />
+            <span className="gd-x">{i === 6 ? "6+" : i}</span>
+          </div>
+        ))}
+        <span className="gd-line" aria-hidden="true"><em>2.5</em></span>
+      </div>
+      {node}
+    </figure>
+  );
+}
+
+/** Last matches per team: goals scored above the line, conceded below, coloured by result. */
+export function FormTimeline({ home, away, form }: { home: string; away: string; form: { home: Array<{ fixture_id: string; starts_at_utc: string; venue: "H" | "A"; opponent: string; goals_for: number; goals_against: number; result: "W" | "D" | "L" }>; away: Array<{ fixture_id: string; starts_at_utc: string; venue: "H" | "A"; opponent: string; goals_for: number; goals_against: number; result: "W" | "D" | "L" }> } }) {
+  const { bind, node } = useTip();
+  const all = [...form.home, ...form.away];
+  const max = Math.max(3, ...all.map((m) => Math.max(m.goals_for, m.goals_against)));
+  const team = (name: string, rows: typeof form.home) => {
+    const list = [...rows].slice(0, 10).reverse();
+    const gf = rows.slice(0, 10).reduce((s, m) => s + m.goals_for, 0), ga = rows.slice(0, 10).reduce((s, m) => s + m.goals_against, 0);
+    const pts = rows.slice(0, 10).reduce((s, m) => s + (m.result === "W" ? 3 : m.result === "D" ? 1 : 0), 0);
+    return (
+      <div className="ft-team">
+        <div className="ft-head"><strong>{name}</strong><span className="tiny muted num">{gf} scored · {ga} conceded · {pts} pts from {Math.min(rows.length, 10)}</span></div>
+        <div className="ft-grid">
+          {list.map((m) => (
+            <div key={m.fixture_id} className={`ft-col ft-${m.result}`} {...bind(<><strong>{m.venue === "H" ? "vs" : "at"} {m.opponent}</strong><br />{m.goals_for}-{m.goals_against} · {m.result === "W" ? "Win" : m.result === "D" ? "Draw" : "Loss"}<br />{new Date(m.starts_at_utc).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</>)}>
+              <span className="ft-up"><i style={{ height: `${(m.goals_for / max) * 100}%` }} /></span>
+              <span className="ft-down"><i style={{ height: `${(m.goals_against / max) * 100}%` }} /></span>
+              <span className="ft-res">{m.result}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  return (
+    <figure className="chart form-timeline">
+      <figcaption className="chart-title">Recent form: goals scored (up) and conceded (down)</figcaption>
+      {team(home, form.home)}
+      {team(away, form.away)}
+      <p className="chart-note">Oldest on the left, most recent on the right. Bar colour shows the result.</p>
+      {node}
+    </figure>
+  );
+}

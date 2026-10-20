@@ -221,7 +221,7 @@
 .insight-card { grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .ic-market > * { flex-shrink: 0; }
 .ic-market .ic-label { flex: 1 1 auto; flex-shrink: 1; }
-@media (max-width: 374px) { .ic-market { gap: 7px; } .ic-market .prob-bar { display: none; } }
+@media (max-width: 374px) { .ic-market { gap: 7px; } }
 
 /* Local reference hero: players sit on the right; keep the text side dark, let the players show. */
 
@@ -230,16 +230,16 @@
 .league-tile-local::before { background: linear-gradient(90deg, rgba(0,20,36,0) 0%, rgba(0,20,36,0) 26%, rgba(0,20,36,.35) 45%, rgba(0,20,36,.45) 100%); }
 .league-tile-local .lt-inner { grid-template-columns: 66px minmax(0, 1fr); column-gap: 14px; padding-left: 16px; }
 
-@media (max-width: 430px) { .ic-market .prob-bar { display: none; } }
 
 /* ================================================================ HERO (design pass 2) */
 .hero { position: relative; overflow: hidden; background: var(--navy-950); color: #fff; isolation: isolate; }
 .hero-art, .hero-art img { position: absolute; inset: 0; width: 100%; height: 100%; }
-.hero-art img { object-fit: cover; object-position: 72% 50%; }
+.hero-art img { object-fit: cover; object-position: 70% 40%; }
 .hero-art-local img { object-position: 100% 50%; }
 .hero-overlay { position: absolute; inset: 0; z-index: 1; background:
-  linear-gradient(90deg, rgba(0,20,36,.95) 0%, rgba(0,20,36,.88) 30%, rgba(0,20,36,.35) 54%, rgba(0,20,36,0) 66%),
-  linear-gradient(0deg, rgba(0,20,36,.85) 0%, rgba(0,20,36,0) 34%); }
+  linear-gradient(90deg, rgba(3,26,43,.82) 0%, rgba(3,26,43,.66) 28%, rgba(3,26,43,.22) 50%, rgba(3,26,43,0) 62%),
+  linear-gradient(0deg, rgba(3,26,43,.62) 0%, rgba(3,26,43,0) 30%); }
+.hero-title, .hero-lede, .hero-secondary, .feature-strip strong { text-shadow: 0 1px 14px rgba(0,0,0,.35); }
 .hero-inner { position: relative; z-index: 2; display: grid; grid-template-rows: 1fr auto; min-height: 398px; padding-top: 38px; padding-bottom: 14px; }
 .hero-copy { max-width: 640px; padding-left: 10px; }
 .hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #a9bccd; }
@@ -276,7 +276,8 @@
 /* Phones: image band on top, editorial copy below, simple stats row (no boxed filler). */
 @media (max-width: 767px) {
   .hero-art { position: relative; display: block; height: 58vw; max-height: 300px; }
-  .hero-art img { position: absolute; object-position: 50% 0%; }
+  .hero-art img { position: absolute; object-position: 50% 30%; }
+  .hero-art-local img { object-position: 50% 0%; }
   .hero-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,20,36,0) 55%, var(--navy-950) 100%); }
   .hero-overlay { display: none; }
   .hero-inner { display: block; min-height: 0; padding-top: 4px; padding-bottom: 28px; }
@@ -350,3 +351,25 @@
 .time-cell { white-space: nowrap; }
 .insights-table.no-odds .c-time { width: 9.5%; }
 .insights-table.no-odds .c-league { width: 13%; }
+
+/* Insight cards on phones: label + percentage, then a full-width green meter (owner feedback 2026-10-20). */
+@media (max-width: 860px) {
+  .ic-market { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "label pct go" "bar bar bar"; column-gap: 10px; row-gap: 8px; align-items: center; }
+  .ic-market .ic-label { grid-area: label; }
+  .ic-market .conf-pct { grid-area: pct; font-size: 15px; font-weight: 700; color: var(--accent-text); }
+  .ic-market > svg { grid-area: go; }
+  .ic-market .prob-bar { grid-area: bar; display: block !important; width: 100% !important; height: 8px; }
+  .ic-market .odds-cell { grid-area: pct; }
+}
+
+/* League tiles with natural photos: ball on the left of the image, copy on the right (owner feedback 2026-10-20). */
+.league-tile-photo { background-position: left center; }
+.league-tile-photo::before { background: linear-gradient(90deg, rgba(3,26,43,0) 18%, rgba(3,26,43,.38) 40%, rgba(3,26,43,.72) 66%, rgba(3,26,43,.82) 100%); }
+.league-tile-photo .lt-inner { grid-template-columns: 1fr; padding-left: 37%; padding-right: 14px; row-gap: 4px; }
+.league-tile-photo .lt-title { font-size: 16px; white-space: normal; line-height: 1.2; }
+.league-tile-photo .lt-text { font-size: 13px; }
+.league-tile-photo .lt-title, .league-tile-photo .lt-text { text-shadow: 0 1px 10px rgba(0,0,0,.35); }
+.league-tile-photo .lt-cta { background: rgba(255,255,255,.14); backdrop-filter: blur(4px); }
+.lt-tag { display: inline-flex; align-items: center; gap: 6px; justify-self: start; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.92); }
+.lt-tag i { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.7); }
+@media (max-width: 560px) { .league-tile-photo .lt-inner { padding-left: 40%; } .league-tile-photo .lt-title { font-size: 17px; } }

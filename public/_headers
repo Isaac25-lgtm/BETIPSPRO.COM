@@ -1,0 +1,10 @@
+# Static asset caching (Cloudflare Workers static assets honour this file).
+# Hashed build output never changes, so browsers and the edge may keep it for a year.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/images/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/brand/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800

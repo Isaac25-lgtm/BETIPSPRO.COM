@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import {
-  ArrowRight, BarChart3, CalendarDays, Check, ChevronRight, Crown, FileText, Layers, Scale, ShieldCheck, Trophy,
+  ArrowRight, BarChart3, CalendarDays, Check, ChevronRight, FileText, Scale, ShieldCheck, Trophy,
 } from "lucide-react";
 import { useAuth } from "../app/auth";
 import { useApi } from "../lib/api";
@@ -244,24 +244,25 @@ function InsightCard({ f, showOdds }: { f: FixtureSummary; showOdds: boolean }) 
 }
 
 const LEAGUES = [
-  { id: "apif:39", title: "Premier League hub", text: "Evidence and model probabilities for EPL matches.", cta: "View EPL hub", img: "/images/league-premier.webp", Icon: Crown },
-  { id: "apif:140", title: "La Liga hub", text: "Transparent research on Spain's top-flight matches.", cta: "View La Liga hub", img: "/images/league-liga.webp", Icon: Layers },
-  { id: "apif:2", title: "Champions League hub", text: "Europe's elite club competition, match by match.", cta: "View UCL hub", img: "/images/league-continental.webp", Icon: Trophy },
+  { id: "apif:39", title: "Premier League hub", tag: "England", color: "#7c3aed", text: "Evidence and model probabilities for EPL matches.", cta: "View EPL hub", img: "/images/league-premier.webp" },
+  { id: "apif:140", title: "La Liga hub", tag: "Spain", color: "#ea580c", text: "Transparent research on Spain's top-flight matches.", cta: "View La Liga hub", img: "/images/league-liga.webp" },
+  { id: "apif:2", title: "Champions League hub", tag: "Europe", color: "#2563eb", text: "Europe's elite club competition, match by match.", cta: "View UCL hub", img: "/images/league-continental.webp" },
 ];
 
 function LeagueTiles() {
   return (
     <section className="league-tiles" aria-label="League hubs">
-      {LEAGUES.map(({ id, title, text, cta, img, Icon }) => (
+      {LEAGUES.map(({ id, title, tag, color, text, cta, img }) => (
         <Link
           key={id}
           to={`/leagues/${encodeURIComponent(id)}`}
-          className={`league-tile ${LOCAL_REFERENCE_HERO ? "league-tile-local" : ""}`}
+          className={`league-tile ${LOCAL_REFERENCE_HERO ? "league-tile-local" : "league-tile-photo"}`}
           style={{ backgroundImage: `url(${LOCAL_REFERENCE_HERO ? img.replace("/images/", "/images/local/") : img})` }}
         >
           <span className="lt-inner">
-            <span className="lt-icon" aria-hidden="true">{!LOCAL_REFERENCE_HERO && <Icon size={46} strokeWidth={1.6} />}</span>
+            {LOCAL_REFERENCE_HERO && <span className="lt-icon" aria-hidden="true" />}
             <span className="lt-body">
+              {!LOCAL_REFERENCE_HERO && <span className="lt-tag"><i style={{ background: color }} />{tag}</span>}
               <span className="lt-title">{title}</span>
               <span className="lt-text">{text}</span>
               <span className="lt-cta">{cta} <ArrowRight size={14} /></span>

@@ -8,6 +8,8 @@ const stripLocalOnlyAssets = {
   name: "strip-local-only-assets",
   closeBundle() {
     rmSync("dist/client/images/local", { recursive: true, force: true });
+    // Downloaded club crests stay unpublished until the owner approves (D-028).
+    rmSync("dist/client/crests", { recursive: true, force: true });
   },
 };
 

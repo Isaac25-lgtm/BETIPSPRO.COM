@@ -44,10 +44,12 @@
   "triggers": { "crons": ["15 */3 * * *"] },
 
   // Hosted testing deployment (owner request 2026-10-20). Build with CLOUDFLARE_ENV=production.
-  // Free plan only: Workers Free + D1 free tier. Secrets via `wrangler secret put <NAME> --env production`.
+  // Owner's paid Cloudflare plan. Secrets via `wrangler secret put <NAME> --env production`.
   "env": {
     "production": {
       "name": "bettipspro",
+      // Run the Worker next to the D1 primary (WEUR) so a page's several queries are local round trips.
+      "placement": { "mode": "smart" },
       "d1_databases": [
         { "binding": "DB", "database_name": "fip-prod", "database_id": "fe2844ec-a183-46ce-be58-0d83049f4ed9", "migrations_dir": "migrations" }
       ],

@@ -31,3 +31,8 @@ model-pipeline/research/*.pkl
 
 # Production admin credentials (local only)
 prod-admin.local.txt
+
+# Downloaded crests awaiting owner permission to publish (D-028)
+public/crests/
+src/lib/crest-manifest.json
+.crests-pending/

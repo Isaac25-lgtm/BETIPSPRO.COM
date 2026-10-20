@@ -186,7 +186,7 @@ function MatchRow({ m }: { m: OverviewMatch }) {
   );
 }
 
-function ModelRecord({ stats }: { stats?: Stats }) {
+function ModelRecord({ stats }: { stats?: Stats | null }) {
   const evals = stats?.evaluations ?? [];
   const comps = [...new Map(evals.filter((e) => e.competition_id).map((e) => [e.competition_id!, e.competition ?? e.competition_id!])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const rows: Array<[string | null, string]> = [[null, "All competitions"], ...comps];

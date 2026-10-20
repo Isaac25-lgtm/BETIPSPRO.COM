@@ -360,7 +360,7 @@ function Config() {
           {busy ? "Saving..." : open ? "Lock reports (use credits)" : "Open every report"}
         </button>
         {msg && <p className="form-ok small" role="status" style={{ marginTop: 10 }}>{msg}</p>}
-        <p className="tiny muted" style={{ marginTop: 8 }}>Public pages can take up to a minute to reflect a change.</p>
+        <p className="tiny muted" style={{ marginTop: 8 }}>Reports switch immediately; banners and copy on public pages can take up to 5 minutes to update.</p>
       </section>
       <section className="card card-pad"><h2 className="h-card">Environment</h2><pre className="code-out">{JSON.stringify(data?.environment_flags ?? {}, null, 2)}</pre></section>
       <section className="card card-pad" style={{ marginTop: 16 }}><h2 className="h-card">Runtime config</h2><pre className="code-out">{JSON.stringify(data?.runtime ?? [], null, 2)}</pre></section>

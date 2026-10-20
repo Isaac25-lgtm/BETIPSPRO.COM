@@ -36,7 +36,8 @@ let counter = 0;
 export async function createTestEnv(opts: { seed?: boolean; vars?: Partial<Env> } = {}): Promise<TestCtx> {
   const dir = `.wrangler/test-state/${process.pid}-${Date.now()}-${counter++}`;
   const proxy = await getPlatformProxy<Env>({ configPath: "wrangler.jsonc", persist: { path: dir } });
-  const env = { ...proxy.env, ...opts.vars } as Env;
+  // Tests never use the developer's real provider key from .dev.vars; they opt in explicitly via opts.vars.
+  const env = { ...proxy.env, API_FOOTBALL_KEY: undefined, SPORTS_PROVIDER: "demo", ...opts.vars } as Env;
   for (const f of readdirSync("migrations").filter((x) => x.endsWith(".sql")).sort()) {
     const stmts = splitSql(readFileSync(`migrations/${f}`, "utf8"));
     for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50).map((s) => env.DB.prepare(s)));

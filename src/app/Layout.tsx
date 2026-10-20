@@ -17,7 +17,7 @@ const NAV = [
 
 function DataModeBanner() {
   const { config } = useAuth();
-  if (!config || config.data_mode !== "DEMO") return null;
+  if (!config || (config.data_mode !== "DEMO" && !config.synthetic_data_present)) return null;
   return (
     <div className="mode-banner" role="note">
       <div className="container mode-banner-inner">

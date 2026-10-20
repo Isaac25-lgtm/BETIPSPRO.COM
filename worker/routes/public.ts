@@ -22,9 +22,12 @@ publicRoutes.get("/health", async (c) => {
   return ok(c, { status: db?.ok === 1 ? "ok" : "degraded", db_latency_ms: Date.now() - t0, env: c.env.APP_ENV, data_mode: dataMode(c.env), version: c.env.GIT_COMMIT ?? "local" });
 });
 
-publicRoutes.get("/config/public", (c) =>
-  ok(c, {
+publicRoutes.get("/config/public", async (c) => {
+  // The demo banner must follow the DATA being shown, not just whether a provider key exists.
+  const syn = await c.env.DB.prepare("SELECT EXISTS (SELECT 1 FROM fixtures WHERE is_synthetic = 1) AS s").first<{ s: number }>();
+  return ok(c, {
     data_mode: dataMode(c.env),
+    synthetic_data_present: !!syn?.s,
     payments_enabled: flag(c.env.PAYMENTS_ENABLED),
     invite_only: flag(c.env.BETA_INVITE_ONLY),
     max_beta_users: num(c.env.MAX_BETA_USERS, 5),
@@ -34,8 +37,8 @@ publicRoutes.get("/config/public", (c) =>
     performance_only_verified: flag(c.env.PUBLIC_PERFORMANCE_ONLY_VERIFIED),
     market_catalog_version: catalog.version,
     today_eat: todayEat(),
-  }, { cache: PUBLIC_CACHE }),
-);
+  }, { cache: PUBLIC_CACHE });
+});
 
 publicRoutes.get("/competitions", async (c) => {
   const supported = c.req.query("supported");

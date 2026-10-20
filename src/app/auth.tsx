@@ -9,6 +9,7 @@ export interface Me {
 
 export interface PublicConfig {
   data_mode: "DEMO" | "FREE_API" | "PRODUCTION";
+  synthetic_data_present: boolean;
   payments_enabled: boolean;
   invite_only: boolean;
   max_beta_users: number;

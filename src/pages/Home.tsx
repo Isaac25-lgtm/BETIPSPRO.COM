@@ -60,7 +60,7 @@ function Hero() {
       <div className="hero-overlay" />
       <div className="container hero-inner">
         <div className="hero-copy">
-          {config?.data_mode === "DEMO" && (
+          {(config?.data_mode === "DEMO" || config?.synthetic_data_present) && (
             <p className="hero-eyebrow">
               <span className="hero-eyebrow-dot" aria-hidden="true" />
               Demo build · fictional teams and data

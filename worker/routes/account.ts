@@ -147,6 +147,12 @@ accountRoutes.post("/me/data-request", async (c) => {
 
 // ------------------------------------------------------------------ reports & evidence
 
+/** Latest bookmaker update for a fixture: part of the cache key, so new prices appear immediately (indexed lookup). */
+async function oddsVersion(env: AppBindings["Bindings"], fixtureId: string): Promise<string> {
+  const r = await env.DB.prepare("SELECT MAX(collected_at) AS at FROM bookmaker_snapshots WHERE fixture_id = ?").bind(fixtureId).first<{ at: string | null }>();
+  return r?.at ?? "none";
+}
+
 async function canView(c: Context<AppBindings>, fixtureId: string): Promise<"sample" | "admin" | "entitled" | "open"> {
   const f = await c.env.DB.prepare("SELECT is_public_sample FROM fixtures WHERE id = ?").bind(fixtureId).first<{ is_public_sample: number }>();
   if (!f) throw new ApiError(404, "NOT_FOUND", "Fixture not found.");
@@ -188,7 +194,8 @@ accountRoutes.get("/fixtures/:id/report", async (c) => {
   const access = await canView(c, id);
   const v = await c.env.DB.prepare("SELECT report_version FROM match_reports WHERE fixture_id = ? ORDER BY generated_at DESC LIMIT 1").bind(id).first<{ report_version: string }>();
   if (!v) throw new ApiError(409, "REPORT_UNAVAILABLE", "No report has been prepared for this fixture.");
-  const { value, hit } = await cached(`report:${id}:${v.report_version}`, 600, () => fullReport(c.env, id));
+  const ov = await oddsVersion(c.env, id);
+  const { value, hit } = await cached(`report:${id}:${v.report_version}:${ov}`, 600, () => fullReport(c.env, id));
   c.header("X-Cache", hit);
   return ok(c, { ...value, access });
 });
@@ -199,7 +206,8 @@ accountRoutes.get("/fixtures/:id/markets/:marketId/evidence", async (c) => {
   const access = await canView(c, id);
   const v = await c.env.DB.prepare("SELECT report_version FROM match_reports WHERE fixture_id = ? ORDER BY generated_at DESC LIMIT 1").bind(id).first<{ report_version: string }>();
   if (!v) throw new ApiError(409, "REPORT_UNAVAILABLE", "No report has been prepared for this fixture.");
-  const { value, hit } = await cached(`evidence:${id}:${marketId}:${v.report_version}`, 600, () => marketEvidence(c.env, id, marketId));
+  const ov = await oddsVersion(c.env, id);
+  const { value, hit } = await cached(`evidence:${id}:${marketId}:${v.report_version}:${ov}`, 600, () => marketEvidence(c.env, id, marketId));
   const ai = c.env.AI_EXPLANATIONS_ENABLED === "true" ? await cachedSummary(c.env, id, marketId, v.report_version) : null;
   c.header("X-Cache", hit);
   return ok(c, { ...value, ai_summary: ai, access });

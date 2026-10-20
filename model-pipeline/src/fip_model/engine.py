@@ -38,6 +38,10 @@ MIN_COUNT_MATCHES = 40
 CORNER_PMF_SIZE = 31
 CARD_PMF_SIZE = 16
 UNCERTAINTY_SAMPLES = 250
+# Full-time goals shrinkage (D-025): quality ridge 4 == the previous single ridge of 2 for 1X2; goal-propensity
+# ridge 48 added after the rolling-origin study (model-pipeline/research, docs/model-v1.2-evaluation.md).
+GOALS_RIDGE_QUALITY = 4.0
+GOALS_RIDGE_PROPENSITY = 48.0
 
 ARCHIVE_MARKETS = [
     "MATCH_RESULT_HOME_REGULATION",
@@ -158,7 +162,7 @@ def fit_competition(df: pd.DataFrame, cutoff: pd.Timestamp, catalog: dict, with_
         goals = fit_goals(
             list(train["home_team_id"]), list(train["away_team_id"]),
             train["home_goals"].to_numpy(), train["away_goals"].to_numpy(), days,
-            with_uncertainty=with_uncertainty,
+            with_uncertainty=with_uncertainty, ridge_s=GOALS_RIDGE_QUALITY, ridge_t=GOALS_RIDGE_PROPENSITY,
         )
         ht_rows = train["home_goals_ht"].notna()
         if ht_rows.sum() >= MIN_LEAGUE_MATCHES:
@@ -544,6 +548,7 @@ def run(dataset: Dataset, catalog: dict, data_mode: str, now: datetime, seed: in
             "config": {"component_versions": {"goals": GOALS_MODEL_VERSION, "first_half": FIRST_HALF_MODEL_VERSION,
                                               "corners": CORNERS_MODEL_VERSION, "cards": CARDS_MODEL_VERSION},
                        "time_decay_xi_per_day": 0.0019, "min_team_matches": MIN_TEAM_MATCHES,
+                       "goals_ridge_quality": GOALS_RIDGE_QUALITY, "goals_ridge_propensity": GOALS_RIDGE_PROPENSITY,
                        "min_league_matches": MIN_LEAGUE_MATCHES, "min_count_matches": MIN_COUNT_MATCHES,
                        "uncertainty_samples": UNCERTAINTY_SAMPLES, "calibration": "none (raw model probabilities)"},
         },

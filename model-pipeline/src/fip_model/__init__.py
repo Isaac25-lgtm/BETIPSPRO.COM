@@ -5,8 +5,8 @@ Outputs are versioned JSON artifacts imported into D1 by an authenticated admin 
 """
 
 PIPELINE_VERSION = "pipeline-0.1.0"
-GOALS_MODEL_VERSION = "goals-dc-v0.1"
+GOALS_MODEL_VERSION = "goals-dc-v0.2"
 FIRST_HALF_MODEL_VERSION = "fh-poisson-v0.1"
 CORNERS_MODEL_VERSION = "corners-nb-v0.1"
 CARDS_MODEL_VERSION = "cards-nb-v0.1"
-MODEL_VERSION = "fip-v0.1"
+MODEL_VERSION = "fip-v0.2"

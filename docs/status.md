@@ -81,5 +81,6 @@
 | First-half over 0.5 | 0.6018 / 0.6111 | 0.2068 / 0.2104 |
 
   The model beats the base rate on all four, with a small edge on BTTS. This is one sample of 250 matches; it is not yet a validated track record, and nothing has been compared with bookmaker prices.
+- **Model v0.2 (same day)**: a larger rolling-origin study (1,781 real matches) showed the v0.1 gains on O/U 2.5 and BTTS did not hold over a full season. v0.2 shrinks each team's goal propensity harder: O/U log loss improved by 0.020 and BTTS by 0.013 (both significant), with 1X2 unchanged. On the standard 250-match backtest: 1X2 0.9568, O/U 0.6510, BTTS 0.6718, first half 0.6018. Details: `docs/model-v1.2-evaluation.md`.
 - 77 real fixtures in the next 10 days have reports. Corners and cards show Insufficient evidence: the free tier has no such statistics. Champions League newcomers with too few matches are also Insufficient.
 - Demo data is hidden automatically once real reports exist. The free sample report is PSG vs FC Barcelona.

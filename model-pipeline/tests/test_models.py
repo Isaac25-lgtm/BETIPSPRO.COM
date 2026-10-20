@@ -197,3 +197,78 @@ def test_team_without_history_is_insufficient_not_a_crash(world):
     _p, rows = forecast_fixture(m, newcomer, CATALOG, np.random.default_rng(0), demo=False, n_samples=5)
     goals = next(r for r in rows if r["market_id"] == "TOTAL_GOALS_OVER_2_5_REGULATION")
     assert goals["probability"] is None and goals["status"] == "INSUFFICIENT"
+
+
+# ---------------------------------------------------------------- v0.2 goals model (D-025)
+
+def _toy(seed=3, n=240, k=10):
+    rng = np.random.default_rng(seed)
+    teams = [f"t{i}" for i in range(k)]
+    h = [teams[i] for i in rng.integers(0, k, n)]
+    a = [teams[(teams.index(x) + 1 + rng.integers(0, k - 1)) % k] for x in h]
+    return h, a, rng.poisson(1.5, n), rng.poisson(1.1, n), rng.uniform(0, 400, n)
+
+
+@pytest.mark.parametrize("lam,mu", [(0.2, 0.2), (1.4, 1.1), (3.5, 0.4), (6.0, 5.5), (9.0, 0.3)])
+@pytest.mark.parametrize("rho", [-0.2, -0.05, 0.0, 0.15, 0.2])
+def test_dc_matrix_valid_for_extreme_rates(lam, mu, rho):
+    from fip_model.models.goals import TAIL_TOL, admissible_rho, grid_size
+    from scipy.stats import poisson
+    m = dc_matrix(lam, mu, rho)
+    assert np.isfinite(m).all() and m.min() >= 0 and abs(m.sum() - 1) < 1e-12
+    r = admissible_rho(lam, mu, rho)
+    assert min(1 - lam * mu * r, 1 + lam * r, 1 + mu * r, 1 - r) >= -1e-12  # every DC factor non-negative
+    k = grid_size(lam, mu)
+    assert max(poisson.sf(k, lam), poisson.sf(k, mu)) < TAIL_TOL or k == 25  # omitted tail is negligible
+
+
+def test_admissible_rho_leaves_ordinary_values_unchanged():
+    from fip_model.models.goals import admissible_rho
+    assert admissible_rho(1.5, 1.2, -0.12) == -0.12
+
+
+def test_analytic_gradient_matches_finite_differences():
+    from scipy.optimize import approx_fprime
+    import fip_model.models.goals as g
+    h, a, x, y, d = _toy()
+    for kw in ({}, {"ridge_s": 4.0, "ridge_t": 48.0}):
+        fit = fit_goals(h, a, x, y, d, with_uncertainty=False, **kw)
+        captured = {}
+        orig = g.minimize
+
+        def spy(fun, x0, **k):
+            captured["f"] = fun
+            return orig(fun, x0, **k)
+
+        g.minimize = spy
+        try:
+            fit_goals(h, a, x, y, d, with_uncertainty=False, **kw)
+        finally:
+            g.minimize = orig
+        f = captured["f"]
+        p0 = fit.params + 0.01
+        num = approx_fprime(p0, lambda p: f(p)[0], 1e-6)
+        assert np.allclose(f(p0)[1], num, rtol=1e-3, atol=1e-3)
+
+
+def test_equal_split_ridges_reproduce_single_ridge():
+    h, a, x, y, d = _toy()
+    f1 = fit_goals(h, a, x, y, d, ridge=2.0, with_uncertainty=False)
+    f2 = fit_goals(h, a, x, y, d, ridge_s=4.0, ridge_t=4.0, with_uncertainty=False)
+    assert np.allclose(f1.params, f2.params, atol=1e-4)
+
+
+def test_propensity_shrinkage_pulls_totals_not_quality():
+    h, a, x, y, d = _toy(n=160)
+    base = fit_goals(h, a, x, y, d, ridge_s=4.0, ridge_t=4.0, with_uncertainty=False)
+    new = fit_goals(h, a, x, y, d, ridge_s=4.0, ridge_t=48.0, with_uncertainty=False)
+    n = base.n_teams
+    prop = lambda f: np.abs(f.params[3:3 + n] + f.params[3 + n:]).sum() / 2
+    qual = lambda f: np.abs(f.params[3:3 + n] - f.params[3 + n:]).sum() / 2
+    assert prop(new) < 0.7 * prop(base)  # goal propensity is pulled towards the league level
+    assert abs(qual(new) - qual(base)) < 0.1 * qual(base)  # team quality (what drives 1X2) is left alone
+
+
+def test_fit_converges_and_reports_sample(comp_models):
+    _, m = comp_models
+    assert m.goals.converged and m.goals.ridge_t == 48.0 and m.goals.cov is not None

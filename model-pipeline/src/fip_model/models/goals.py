@@ -6,6 +6,10 @@ with the Dixon-Coles low-score correction tau(x, y; rho).
 
 The same class (rho fixed to 0, stronger shrinkage) is reused for first-half goals.
 Uncertainty: Laplace approximation (numerical Hessian at the MAP), parameter sampling.
+
+Shrinkage (v0.2, D-025): optionally split into team QUALITY s=(att-dfn)/2, which drives 1X2, and goal
+PROPENSITY t=(att+dfn)/2, which drives totals/BTTS. A rolling-origin study on 1,781 real matches showed totals
+and BTTS overfit under a single ridge while 1X2 did not; shrinking t harder fixed that without hurting 1X2.
 """
 
 from __future__ import annotations
@@ -17,7 +21,9 @@ from scipy.optimize import minimize
 from scipy.special import gammaln
 from scipy.stats import poisson
 
-MAX_GOALS = 10  # scoreline grid 0..10 per side; mass beyond is negligible for football rates
+MAX_GOALS = 10  # minimum scoreline grid 0..10 per side
+TAIL_TOL = 1e-10  # the grid grows until each side's Poisson tail beyond it is below this
+GRID_CAP = 25
 
 
 @dataclass
@@ -34,6 +40,8 @@ class GoalsFit:
     nll: float
     league_avg_goals: float
     team_index: dict[str, int] = field(default_factory=dict)
+    ridge_s: float | None = None
+    ridge_t: float | None = None
 
     # parameter layout: [mu, home_adv, rho, attack(n), defence(n)]
     @property
@@ -61,24 +69,36 @@ class GoalsFit:
         return rng.multivariate_normal(self.params, self.cov, size=n, check_valid="ignore", method="eigh")
 
 
+def admissible_rho(lam: float, mu: float, rho: float) -> float:
+    """Clamp rho into the range where all four Dixon-Coles factors are non-negative for these rates:
+    max(-1/lam, -1/mu) <= rho <= min(1/(lam*mu), 1). Inside the range rho is returned unchanged."""
+    lo = max(-1.0 / lam, -1.0 / mu)
+    hi = min(1.0 / (lam * mu), 1.0)
+    return float(min(max(rho, lo), hi))
+
+
+def grid_size(lam: float, mu: float, max_goals: int = MAX_GOALS) -> int:
+    """Smallest grid (>= max_goals) whose per-side Poisson tail mass is below TAIL_TOL."""
+    k = max_goals
+    while k < GRID_CAP and max(poisson.sf(k, lam), poisson.sf(k, mu)) > TAIL_TOL:
+        k += 1
+    return k
+
+
 def dc_matrix(lam: float, mu: float, rho: float, max_goals: int = MAX_GOALS) -> np.ndarray:
-    """Scoreline probability matrix M[h, a] with Dixon-Coles correction, normalised to sum 1."""
-    g = np.arange(max_goals + 1)
+    """Scoreline probability matrix M[h, a] with the Dixon-Coles correction.
+
+    Rho is kept inside its admissible range (so no factor is negative and nothing is silently clipped), and
+    the grid grows until the omitted tail is < TAIL_TOL per side, so the final renormalisation only removes
+    numerically negligible mass."""
+    rho = admissible_rho(lam, mu, rho)
+    g = np.arange(grid_size(lam, mu, max_goals) + 1)
     m = np.outer(poisson.pmf(g, lam), poisson.pmf(g, mu))
-    m[0, 0] *= max(1 - lam * mu * rho, 1e-9)
-    m[0, 1] *= max(1 + lam * rho, 1e-9)
-    m[1, 0] *= max(1 + mu * rho, 1e-9)
-    m[1, 1] *= max(1 - rho, 1e-9)
+    m[0, 0] *= 1 - lam * mu * rho
+    m[0, 1] *= 1 + lam * rho
+    m[1, 0] *= 1 + mu * rho
+    m[1, 1] *= 1 - rho
     return m / m.sum()
-
-
-def _tau_log(x, y, lam, mu, rho):
-    t = np.ones_like(lam)
-    t = np.where((x == 0) & (y == 0), 1 - lam * mu * rho, t)
-    t = np.where((x == 0) & (y == 1), 1 + lam * rho, t)
-    t = np.where((x == 1) & (y == 0), 1 + mu * rho, t)
-    t = np.where((x == 1) & (y == 1), 1 - rho, t)
-    return np.log(np.clip(t, 1e-9, None))
 
 
 def fit_goals(
@@ -91,10 +111,14 @@ def fit_goals(
     ridge: float = 2.0,
     fit_rho: bool = True,
     with_uncertainty: bool = True,
+    ridge_s: float | None = None,
+    ridge_t: float | None = None,
 ) -> GoalsFit:
-    """Fit by penalised weighted maximum likelihood.
+    """Fit by penalised weighted maximum likelihood (analytic gradient).
 
     days_before_cutoff >= 0 for every training match (leakage guard enforced by caller and asserted here).
+    ridge_s/ridge_t: when given, replace the single ridge with separate shrinkage on quality (att-dfn)/2 and
+    propensity (att+dfn)/2. ridge_s = ridge_t = 2*ridge reproduces the single-ridge fit exactly.
     """
     days = np.asarray(days_before_cutoff, dtype=float)
     if np.any(days < 0):
@@ -108,25 +132,54 @@ def fit_goals(
     w = np.exp(-xi * days)
     n = len(teams)
     const = gammaln(x + 1) + gammaln(y + 1)
+    split = ridge_s is not None and ridge_t is not None
+    m00, m01, m10, m11 = (x == 0) & (y == 0), (x == 0) & (y == 1), (x == 1) & (y == 0), (x == 1) & (y == 1)
 
-    def nll(p):
+    def nll_grad(p):
         mu, ha, rho = p[0], p[1], p[2] if fit_rho else 0.0
         att, dfn = p[3 : 3 + n], p[3 + n :]
-        lam = np.exp(mu + ha + att[hi] + dfn[ai])
-        lmu = np.exp(mu + att[ai] + dfn[hi])
-        ll = x * np.log(lam) - lam + y * np.log(lmu) - lmu - const
+        log_lam = mu + ha + att[hi] + dfn[ai]
+        log_lmu = mu + att[ai] + dfn[hi]
+        lam, lmu = np.exp(log_lam), np.exp(log_lmu)
+        tau = np.ones_like(lam)
+        d_lam = np.zeros_like(lam); d_lmu = np.zeros_like(lam); d_rho = np.zeros_like(lam)  # d tau / d(log rate), d rho
         if fit_rho:
-            ll = ll + _tau_log(x, y, lam, lmu, rho)
-        pen = 0.5 * ridge * (np.sum(att**2) + np.sum(dfn**2))
+            tau[m00] = 1 - lam[m00] * lmu[m00] * rho
+            d_lam[m00] = d_lmu[m00] = -lam[m00] * lmu[m00] * rho
+            d_rho[m00] = -lam[m00] * lmu[m00]
+            tau[m01] = 1 + lam[m01] * rho; d_lam[m01] = lam[m01] * rho; d_rho[m01] = lam[m01]
+            tau[m10] = 1 + lmu[m10] * rho; d_lmu[m10] = lmu[m10] * rho; d_rho[m10] = lmu[m10]
+            tau[m11] = 1 - rho; d_rho[m11] = -1.0
+        tau = np.clip(tau, 1e-9, None)
+        ll = x * log_lam - lam + y * log_lmu - lmu - const + np.log(tau)
+        if split:
+            q, t = (att - dfn) / 2, (att + dfn) / 2
+            pen = 0.5 * ridge_s * (q @ q) + 0.5 * ridge_t * (t @ t)
+            g_att, g_dfn = 0.5 * (ridge_s * q + ridge_t * t), 0.5 * (-ridge_s * q + ridge_t * t)
+        else:
+            pen = 0.5 * ridge * (att @ att + dfn @ dfn)
+            g_att, g_dfn = ridge * att, ridge * dfn
         # soft sum-to-zero identifiability constraint
         pen += 50.0 * (att.sum() ** 2 + dfn.sum() ** 2)
-        return -np.sum(w * ll) + pen
+        gl = w * (x - lam + d_lam / tau)
+        gm = w * (y - lmu + d_lmu / tau)
+        g = np.zeros_like(p)
+        g[0] = -(gl.sum() + gm.sum())
+        g[1] = -gl.sum()
+        if fit_rho:
+            g[2] = -np.sum(w * d_rho / tau)
+        g[3 : 3 + n] = -(np.bincount(hi, gl, n) + np.bincount(ai, gm, n)) + g_att + 100.0 * att.sum()
+        g[3 + n :] = -(np.bincount(ai, gl, n) + np.bincount(hi, gm, n)) + g_dfn + 100.0 * dfn.sum()
+        return -np.sum(w * ll) + pen, g
+
+    def nll(p):
+        return nll_grad(p)[0]
 
     p0 = np.zeros(3 + 2 * n)
     p0[0] = np.log(max((x.mean() + y.mean()) / 2, 0.1))
     p0[1] = 0.2
     bounds = [(None, None), (-1, 1), (-0.2, 0.2) if fit_rho else (0.0, 0.0)] + [(-2.5, 2.5)] * (2 * n)
-    res = minimize(nll, p0, method="L-BFGS-B", bounds=bounds, options={"maxiter": 2000})
+    res = minimize(nll_grad, p0, jac=True, method="L-BFGS-B", bounds=bounds, options={"maxiter": 3000})
 
     cov = None
     if with_uncertainty:
@@ -153,6 +206,8 @@ def fit_goals(
         nll=float(res.fun),
         league_avg_goals=float(np.average(x + y, weights=w)),
         team_index=idx,
+        ridge_s=ridge_s,
+        ridge_t=ridge_t,
     )
 
 

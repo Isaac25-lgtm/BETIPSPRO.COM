@@ -24,3 +24,7 @@ design/reference/homepage-reference.png
 
 # Local-only hero built from the owner reference screenshot (real players/sponsors) - never commit.
 public/images/local/
+
+# Research harness outputs (per-match predictions; regenerate with model-pipeline/research/run_*.py)
+model-pipeline/research/out/
+model-pipeline/research/*.pkl

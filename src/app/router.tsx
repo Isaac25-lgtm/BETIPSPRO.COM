@@ -12,6 +12,7 @@ const MarketEvidence = lazy(() => import("../pages/MarketEvidence"));
 const Leagues = lazy(() => import("../pages/Leagues"));
 const LeagueDetail = lazy(() => import("../pages/Leagues").then((m) => ({ default: m.LeagueDetail })));
 const Statistics = lazy(() => import("../pages/Statistics"));
+const MatchReport = lazy(() => import("../pages/Report"));
 const Archive = lazy(() => import("../pages/Statistics").then((m) => ({ default: m.Archive })));
 const InfoPages = lazy(() => import("../pages/Info"));
 const Auth = lazy(() => import("../pages/Auth"));
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
       { path: "/leagues", element: S(<Leagues />) },
       { path: "/leagues/:id", element: S(<LeagueDetail />) },
       { path: "/statistics", element: S(<Statistics />) },
+      { path: "/report", element: S(<MatchReport />) },
       { path: "/predictions/archive", element: S(<Archive />) },
       { path: "/research/how-it-works", element: S(<InfoPages page="how" />) },
       { path: "/pricing", element: S(<InfoPages page="pricing" />) },

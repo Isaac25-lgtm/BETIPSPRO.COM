@@ -166,7 +166,19 @@ Before any public or paid launch, these gates remain open: brand/trademark, data
 
 ## Deployment
 
-Nothing is deployed. The project is ready for Cloudflare Workers + D1; follow the [deploy runbook](docs/cloudflare-deploy-runbook.md). Each step needs owner approval. CI runs on every push ([ci.yml](.github/workflows/ci.yml)); preview deploys are disabled unless explicitly approved.
+Live testing deployment: **https://bettipspro.omodingisaac123.workers.dev** (Cloudflare Workers + D1, worker `bettipspro`, database `fip-prod`). Every report is open while testing; switch it in Admin > Config.
+
+```bash
+# redeploy the site
+CLOUDFLARE_ENV=production npx vite build && npx wrangler deploy
+# schema changes
+npx wrangler d1 migrations apply DB --remote --env production
+# refresh data: fit offline, then import through the authenticated admin API
+cd model-pipeline && python run.py fit --input data/raw/fdo-export.json --out data/exports/artifact.json && cd ..
+node scripts/import-artifact.mjs --file model-pipeline/data/exports/artifact.json --url https://bettipspro.omodingisaac123.workers.dev --admin-email <admin> --admin-password <pw>
+```
+
+Production secrets are set with `npx wrangler secret put <NAME> --env production` and never live in the repo. The production admin login is in the gitignored `prod-admin.local.txt`. CI runs on every push ([ci.yml](.github/workflows/ci.yml)). See also the [deploy runbook](docs/cloudflare-deploy-runbook.md).
 
 ## License
 

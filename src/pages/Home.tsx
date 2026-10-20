@@ -91,12 +91,12 @@ function Hero() {
           <li><span className="fs-icon"><BarChart3 size={20} strokeWidth={2} /></span><span><strong>Model probabilities</strong><small>50+ markets per match</small></span></li>
           <li><span className="fs-icon"><ShieldCheck size={20} strokeWidth={2} /></span><span><strong>Real match evidence</strong><small>Every number is traceable</small></span></li>
           <li><span className="fs-icon"><Trophy size={20} strokeWidth={2} /></span><span><strong>League hubs</strong><small>Tables, form and fixtures</small></span></li>
-          <li><span className="fs-icon"><FileText size={20} strokeWidth={2} /></span><span><strong>Full match reports</strong><small>One credit unlocks it all</small></span></li>
+          <li><span className="fs-icon"><FileText size={20} strokeWidth={2} /></span><span><strong>Full match reports</strong><small>{config?.open_access ? "Open to everyone while we test" : "One credit unlocks it all"}</small></span></li>
         </ul>
         <dl className="hero-stats" aria-label="At a glance">
           <div><dt>Markets per match</dt><dd className="num">56</dd></div>
           <div><dt>Matches today</dt><dd className="num">{today ?? "–"}</dd></div>
-          <div><dt>Free beta reports</dt><dd className="num">{config?.beta_initial_credits ?? 10}</dd></div>
+          {config?.open_access ? <div><dt>Reports open</dt><dd>All</dd></div> : <div><dt>Free beta reports</dt><dd className="num">{config?.beta_initial_credits ?? 10}</dd></div>}
         </dl>
       </div>
     </section>
@@ -136,7 +136,7 @@ function MatchInsightsCard() {
         <>
           <div className="insights-table-wrap">
             <table className={`insights-table ${showOdds ? "" : "no-odds"}`}>
-              <caption className="sr-only">Today&apos;s fixtures with one featured market each. Featured means the model differs most from the league base rate; it is not a recommendation.</caption>
+              <caption className="sr-only">Today&apos;s fixtures with one featured market each. Featured means the model differs most from the league base rate.</caption>
               <colgroup>
                 <col className="c-match" /><col className="c-market" />{showOdds && <col className="c-odds" />}<col className="c-prob" /><col className="c-league" /><col className="c-time" />
               </colgroup>
@@ -287,12 +287,14 @@ function PremiumCard() {
           <li key={t}><Check size={16} strokeWidth={2.6} /> {t}</li>
         ))}
       </ul>
-      {signedIn ? (
+      {config?.open_access ? (
+        <Link to="/report" className="btn btn-primary premium-cta">Open the match report <ArrowRight size={18} /></Link>
+      ) : signedIn ? (
         <Link to="/matches" className="btn btn-primary premium-cta">Unlock a report <ArrowRight size={18} /></Link>
       ) : (
         <Link to="/join" className="btn btn-primary premium-cta">Join the beta <ArrowRight size={18} /></Link>
       )}
-      <p className="premium-foot">{config?.payments_enabled ? "" : `Invite-only beta: ${config?.beta_initial_credits ?? 10} free report credits. No payments taken.`}</p>
+      <p className="premium-foot">{config?.open_access ? "Testing phase: every report is open. No credits needed." : config?.payments_enabled ? "" : `Invite-only beta: ${config?.beta_initial_credits ?? 10} free report credits. No payments taken.`}</p>
     </section>
   );
 }
@@ -442,6 +444,19 @@ function RecentResults() {
 
 function BetaBand() {
   const { me, config } = useAuth();
+  if (config?.open_access) {
+    return (
+      <section className="container beta-band-wrap" aria-label="Match report">
+        <div className="beta-band">
+          <div>
+            <strong>Every report is open while we test</strong>
+            <span>See all upcoming matches with data, the model's record and what we cover. No sign-in needed.</span>
+          </div>
+          <Link to="/report" className="btn btn-primary">Open the match report <ArrowRight size={18} /></Link>
+        </div>
+      </section>
+    );
+  }
   if (me?.user) return null;
   return (
     <section className="container beta-band-wrap" aria-label="Join the beta">

@@ -77,21 +77,18 @@ export default function MarketEvidence() {
           <section className="card card-pad narrative">
             <h2 className="h-card">{e.narrative.headline}</h2>
             {e.narrative.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
-            <ul className="caveats">{e.narrative.caveats.map((c) => <li key={c}>{c}</li>)}</ul>
-            <p className="tiny muted">The explanation above is written by a fixed template from the figures on this page ({e.narrative.generated_by}).</p>
+            {e.narrative.caveats.length > 0 && <ul className="caveats">{e.narrative.caveats.map((c) => <li key={c}>{c}</li>)}</ul>}
             {e.ai_summary && (
               <div className="ai-summary">
                 <span className="ai-label">Match summary</span>
                 <p>{e.ai_summary.summary}</p>
                 {e.ai_summary.key_points?.length > 0 && <ul>{e.ai_summary.key_points.map((k) => <li key={k}>{k}</li>)}</ul>}
-                <span className="ai-foot">Written automatically from the figures on this page and checked against them.</span>
               </div>
             )}
           </section>
 
           <section className="ev-sets" aria-label="Observed evidence">
             <h2 className="h-section ev-h2">Observed evidence</h2>
-            <p className="muted small">Actual prior matches available at the forecast cut-off. Team samples are oriented to this fixture, so “hit” means the equivalent outcome occurred from that team&apos;s perspective. These historical shares are not the model probability.</p>
             <div className="sets-grid">
               {e.observed_evidence.map((s) => <EvidenceCard key={s.key} s={s} kind={e.evidence_kind} />)}
             </div>
@@ -112,17 +109,15 @@ export default function MarketEvidence() {
         <aside className="ev-side">
           <section className="card card-pad">
             <h2 className="h-card">Model drivers</h2>
-            <p className="tiny muted">{e.methodology}</p>
             <dl className="driver-list">
               {e.model_drivers.map((d) => <div key={d.metric}><dt>{metricLabels[d.metric] ?? d.metric}</dt><dd className="num">{d.value == null ? "-" : Number.isInteger(d.value) ? d.value : d.value.toFixed(3)}</dd></div>)}
             </dl>
-            {f.uncertainty?.method && <p className="tiny muted">Uncertainty: {f.uncertainty.method}. {f.uncertainty.note}</p>}
           </section>
 
           <section className="card card-pad">
             <h2 className="h-card">Price panel</h2>
             {e.prices.length === 0 ? (
-              <p className="muted small">No licensed price for this market. Prices are shown only when our provider covers them; we never invent them.</p>
+              <p className="muted small">No price for this market.</p>
             ) : e.prices.map((pr) => (
               <div key={pr.bookmaker} className="price-box">
                 <div className="row" style={{ justifyContent: "space-between" }}>
@@ -140,13 +135,11 @@ export default function MarketEvidence() {
                 {pr.stale && <p className="tiny muted">Comparison disabled: price is stale.</p>}
               </div>
             ))}
-            <p className="tiny muted">The model probability is independent of bookmaker prices. Not betting advice.</p>
           </section>
 
           <section className="card card-pad">
             <h2 className="h-card"><Scale size={16} style={{ display: "inline", verticalAlign: "-2px" }} /> Settlement definition</h2>
             <p className="small">{e.market.settlement_rules}</p>
-            <p className="tiny muted">We have not verified compatibility with any specific bookmaker&apos;s rules (e.g. betPawa). Always read your operator&apos;s definitions.</p>
           </section>
 
           <section className="card card-pad">

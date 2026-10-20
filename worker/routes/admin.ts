@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { setOpenAccess } from "../services/access.ts";
 import { z } from "zod";
 import type { AppBindings } from "../env.ts";
 import { dataMode, flag, num } from "../env.ts";
@@ -267,6 +268,13 @@ adminRoutes.get("/config", async (c) => {
     },
     utc_day: utcDay(),
   });
+});
+
+adminRoutes.put("/config/access", async (c) => {
+  const b = await body(c, z.object({ open: z.boolean() }));
+  await setOpenAccess(c.env, b.open, c.get("user")!.id);
+  await audit(c, "config.access", "app_config", "access", b);
+  return ok(c, { saved: b });
 });
 
 adminRoutes.put("/config/ingestion", async (c) => {

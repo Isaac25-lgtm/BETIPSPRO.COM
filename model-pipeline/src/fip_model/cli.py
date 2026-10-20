@@ -53,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     f.add_argument("--out", type=Path, required=True)
     f.add_argument("--mode", choices=["FREE_API", "PRODUCTION"], default="FREE_API")
     f.add_argument("--horizon-days", type=int, default=10, help="only forecast fixtures kicking off within N days")
+    f.add_argument("--as-of", type=str, default=None, help="UTC cut-off (ISO, e.g. 2026-10-20T12:30:24Z) to reproduce an earlier run; default now")
     args = ap.parse_args(argv)
 
     catalog = load_catalog()
@@ -69,7 +70,8 @@ def main(argv: list[str] | None = None) -> int:
         if isinstance(raw, dict) and "data" in raw and "ok" in raw:  # Worker API envelope
             raw = raw["data"]
         ds = Dataset(raw["competitions"], raw["teams"], raw.get("referees", []), raw["fixtures"], raw.get("team_stats", []))
-        artifact = run(ds, catalog, args.mode, datetime.now(timezone.utc), horizon_days=args.horizon_days)
+        now = datetime.fromisoformat(args.as_of.replace("Z", "+00:00")) if args.as_of else datetime.now(timezone.utc)
+        artifact = run(ds, catalog, args.mode, now, horizon_days=args.horizon_days)
     _write(artifact, args.out)
     print(_summary(artifact, time.time() - t0))
     return 0

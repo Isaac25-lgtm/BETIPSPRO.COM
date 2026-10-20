@@ -326,10 +326,42 @@ function Audit() {
 }
 
 function Config() {
-  const { data } = useApi<{ runtime: Array<{ key: string; value: unknown; updated_at: string }>; environment_flags: Record<string, unknown> }>("/admin/config");
+  const { data, reload } = useApi<{ runtime: Array<{ key: string; value: unknown; updated_at: string }>; environment_flags: Record<string, unknown> }>("/admin/config");
+  const { refresh } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const access = data?.runtime.find((r) => r.key === "access")?.value as { open?: boolean } | undefined;
+  const open = !!access?.open;
+  const toggle = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await api("/admin/config/access", { method: "PUT", json: { open: !open } });
+      setMsg(!open ? "Every report is now open to everyone." : "Reports are locked again. Testers unlock them with credits.");
+      reload();
+      refresh();
+    } catch (e) {
+      setMsg(e instanceof ApiError ? e.message : "Could not save the setting.");
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <>
       <Head title="Configuration">Environment flags come from wrangler.jsonc / secrets. Secrets are reported only as present or absent.</Head>
+      <section className="card card-pad" style={{ marginBottom: 16 }}>
+        <h2 className="h-card">Report access</h2>
+        <p className="small muted" style={{ margin: "6px 0 12px" }}>
+          {open
+            ? "Open: anyone can read every full report, signed in or not, and no credits are used. Use this while testing."
+            : "Locked: full reports need a credit (the public sample stays free). Credits and unlocks work as normal."}
+        </p>
+        <button className={`btn ${open ? "btn-outline" : "btn-primary"} btn-sm`} disabled={busy || !data} onClick={() => void toggle()}>
+          {busy ? "Saving..." : open ? "Lock reports (use credits)" : "Open every report"}
+        </button>
+        {msg && <p className="form-ok small" role="status" style={{ marginTop: 10 }}>{msg}</p>}
+        <p className="tiny muted" style={{ marginTop: 8 }}>Public pages can take up to a minute to reflect a change.</p>
+      </section>
       <section className="card card-pad"><h2 className="h-card">Environment</h2><pre className="code-out">{JSON.stringify(data?.environment_flags ?? {}, null, 2)}</pre></section>
       <section className="card card-pad" style={{ marginTop: 16 }}><h2 className="h-card">Runtime config</h2><pre className="code-out">{JSON.stringify(data?.runtime ?? [], null, 2)}</pre></section>
     </>

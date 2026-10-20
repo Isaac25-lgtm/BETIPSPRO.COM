@@ -7,6 +7,8 @@ import { todayEat } from "../lib/time.ts";
 import { catalog, marketById } from "../../shared/markets.ts";
 import { fixturePreview, listFixtures, realDataReady } from "../services/fixtures.ts";
 import { publicCache } from "../middleware/public-cache.ts";
+import { openAccess } from "../services/access.ts";
+import { reportOverview } from "../services/overview.ts";
 
 const PUBLIC_CACHE = "public, max-age=30, s-maxage=60, stale-while-revalidate=120";
 export const publicRoutes = new Hono<AppBindings>();
@@ -28,6 +30,7 @@ publicRoutes.get("/config/public", async (c) => {
   return ok(c, {
     data_mode: dataMode(c.env),
     synthetic_data_present: !!syn?.s,
+    open_access: await openAccess(c.env),
     payments_enabled: flag(c.env.PAYMENTS_ENABLED),
     invite_only: flag(c.env.BETA_INVITE_ONLY),
     max_beta_users: num(c.env.MAX_BETA_USERS, 5),
@@ -96,6 +99,8 @@ publicRoutes.get("/fixtures", async (c) => {
   const data = await listFixtures(c.env, { ...p, pageSize: p.page_size });
   return ok(c, data, { cache: PUBLIC_CACHE, meta: { data_mode: dataMode(c.env) } });
 });
+
+publicRoutes.get("/reports/overview", async (c) => ok(c, await reportOverview(c.env), { cache: PUBLIC_CACHE }));
 
 publicRoutes.get("/fixtures/:id/preview", async (c) => ok(c, await fixturePreview(c.env, c.req.param("id")), { cache: PUBLIC_CACHE }));
 

@@ -97,7 +97,7 @@ export interface Report {
   report_status: string;
   generated_at: string;
   display_notice: string | null;
-  access: "sample" | "admin" | "entitled";
+  access: "sample" | "admin" | "entitled" | "open";
   model_run: null | { id: string; model_version: string; pipeline_version: string; dataset_hash: string; data_mode: string; generated_at: string; data_as_of_at: string; market_catalog_version: string; config: Record<string, unknown> };
   summary: { featured?: { market_id: string; probability: number; league_base_rate: number; deviation: number; rule: string } | null; baselines?: Record<string, number>; competition_training_matches?: number; data_as_of_at?: string };
   analysis: { scoreline_matrix: number[][] | null; ht_matrix: number[][] | null; corners_total_pmf: number[] | null; cards_total_pmf: number[] | null };

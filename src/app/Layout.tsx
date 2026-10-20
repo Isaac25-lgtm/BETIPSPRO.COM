@@ -9,9 +9,9 @@ const NAV = [
   { to: "/", label: "Home", end: true },
   { to: "/matches", label: "Today's Matches" },
   { to: "/match-centre", label: "Match Centre" },
+  { to: "/report", label: "Report" },
   { to: "/leagues", label: "Leagues" },
   { to: "/statistics", label: "Statistics" },
-  { to: "/research/how-it-works", label: "Tools" },
   { to: "/predictions/archive", label: "Archive" },
 ];
 
@@ -148,7 +148,8 @@ function Footer() {
             Football evidence and probability research for adults (18+). Information only: probabilities are uncertain estimates, not advice or guarantees. We do not take bets or hold funds.
           </p>
           <p className="footer-owner">
-            Operated by <strong>{brand.companyOwner}</strong>. Product name is a placeholder pending approval.
+            Operated by <strong>{brand.companyOwner}</strong>.
+            <br />Football data provided by the <a href="https://www.football-data.org" target="_blank" rel="noreferrer">football-data.org</a> API.
           </p>
         </div>
         <div>

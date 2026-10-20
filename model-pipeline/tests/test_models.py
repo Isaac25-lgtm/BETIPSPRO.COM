@@ -272,3 +272,11 @@ def test_propensity_shrinkage_pulls_totals_not_quality():
 def test_fit_converges_and_reports_sample(comp_models):
     _, m = comp_models
     assert m.goals.converged and m.goals.ridge_t == 48.0 and m.goals.cov is not None
+
+
+def test_display_matrix_folds_tail_and_keeps_totals():
+    from fip_model.engine import _fold
+    m = dc_matrix(3.74, 0.72, -0.03)
+    f = _fold(m, 7)
+    assert f.shape == (7, 7) and abs(f.sum() - 1) < 1e-9
+    assert abs(np.tril(f, -1).sum() - np.tril(m, -1).sum()) < 0.002  # home-win share survives folding

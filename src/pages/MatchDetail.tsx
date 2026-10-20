@@ -24,10 +24,10 @@ export default function MatchDetail() {
   const { id = "" } = useParams();
   const [sp, setSp] = useSearchParams();
   const tab = (sp.get("tab") as TabId) || "overview";
-  const { me } = useAuth();
+  const { me, config } = useAuth();
   const preview = useApi<Preview>(`/fixtures/${encodeURIComponent(id)}/preview`, { ttlMs: 60_000 });
   const fx = preview.data?.fixture;
-  const canTry = !!fx?.report.available && (fx.is_public_sample || !!me?.user);
+  const canTry = !!fx?.report.available && (fx.is_public_sample || !!me?.user || !!config?.open_access);
   const report = useApi<Report>(canTry ? `/fixtures/${encodeURIComponent(id)}/report` : null, { ttlMs: 120_000 });
   const locked = !report.data;
   const [unlockNote, setUnlockNote] = useState<string | null>(null);
@@ -201,7 +201,7 @@ function LockedView({ p, tab, reason, onUnlocked }: { p: Preview; tab: TabId; re
                 <div>
                   <span className="tiny muted">Featured market (public sample)</span>
                   <strong className="fb-label">{f.featured.label}</strong>
-                  <span className="tiny muted">{p.report?.featured_base_rate != null ? `League base rate ${pct(p.report.featured_base_rate)} · ` : ""}not a recommendation</span>
+                  <span className="tiny muted">{p.report?.featured_base_rate != null ? `League base rate ${pct(p.report.featured_base_rate)}` : ""}</span>
                 </div>
                 <div className="fb-prob"><span className="num">{pct(f.featured.probability)}</span><ProbBar p={f.featured.probability} width={120} /></div>
               </div>
@@ -258,7 +258,6 @@ function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; 
                   );
                 })}
               </div>
-              <p className="tiny muted">1X2 probabilities are derived from one scoreline distribution and sum to 100% (regulation time only; extra time excluded).</p>
             </section>
             <section className="card card-pad">
               <h2 className="h-card">Key markets</h2>
@@ -270,7 +269,7 @@ function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; 
         {tab === "markets" && (
           <section className="card card-pad">
             <h2 className="h-card">All markets</h2>
-            <p className="muted small">Choose any market to open its full evidence page. You are not charged again for exploring markets in this report.</p>
+            <p className="muted small">Choose any market to open its evidence.</p>
             {groupByCategory(r.markets).map(([cat, ms]) => (
               <div key={cat} className="market-cat">
                 <h3>{cat}</h3>
@@ -302,7 +301,7 @@ function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; 
           <>
             {r.analysis.cards_total_pmf ? <section className="card card-pad"><PmfBars values={r.analysis.cards_total_pmf} threshold={3.5} statLabel="yellow cards" title="Total yellow cards distribution (model)" /></section> : <Notice tone="warn">Card data is insufficient for this fixture.</Notice>}
             <section className="card card-pad"><h2 className="h-card">Card markets</h2><MarketList markets={r.markets.filter((m) => m.category === "Cards")} fixtureId={f.id} />
-              <p className="tiny muted">Raw yellow-card counts, not booking points. Referee assignment {p.fixture.referee ? `(${p.fixture.referee.name})` : ""} is not confirmed; referee effects are shrunk towards the league average.</p></section>
+              <p className="tiny muted">Raw yellow-card counts, not booking points.</p></section>
             <Drivers r={r} family="cards_negative_binomial" title="Card model drivers" />
           </>
         )}
@@ -418,8 +417,7 @@ function ReportActions({ r, p }: { r: Report; p: Preview }) {
   const cite = `${p.fixture.home.name} vs ${p.fixture.away.name}, ${longDate(p.fixture.starts_at_utc)}. Report ${r.report_version}, generated ${r.generated_at}. ${location.origin}/matches/${encodeURIComponent(p.fixture.id)}`;
   return (
     <section className="card card-pad actions-card">
-      <div className="row"><ShieldCheck size={20} color="#067a3e" /><strong>{r.access === "sample" ? "Free sample report" : r.access === "admin" ? "Admin view" : "Unlocked report"}</strong></div>
-      <p className="tiny muted">All markets and sections are open. Exploring them is free.</p>
+      <div className="row"><ShieldCheck size={20} color="#067a3e" /><strong>{r.access === "sample" ? "Free sample report" : r.access === "admin" ? "Admin view" : r.access === "open" ? "Open report (testing phase)" : "Unlocked report"}</strong></div>
       <div className="row-wrap">
         <button className="btn btn-outline btn-sm" onClick={() => { void navigator.clipboard?.writeText(cite); setCopied(true); setTimeout(() => setCopied(false), 1500); }}><Copy size={15} /> {copied ? "Copied" : "Copy citation"}</button>
         <button className="btn btn-outline btn-sm" onClick={() => window.print()}><Printer size={15} /> Print summary</button>
@@ -434,7 +432,6 @@ function Drivers({ r, family, title }: { r: Report; family: string; title: strin
   return (
     <section className="card card-pad">
       <h2 className="h-card">{title}</h2>
-      <p className="tiny muted">These are the model's internal inputs for this fixture (not historical hit-rates).</p>
       <dl className="driver-grid">
         {d.map((x) => <div key={x.metric}><dt>{metricLabels[x.metric] ?? x.metric}</dt><dd className="num">{x.value == null ? "-" : Number.isInteger(x.value) ? x.value : x.value.toFixed(3)}</dd></div>)}
       </dl>
@@ -450,7 +447,7 @@ function OddsSection({ r, fixtureId }: { r: Report; fixtureId: string }) {
       <h2 className="h-card">Prices vs model</h2>
       {synthetic && <Notice tone="demo">These prices come from a <strong>synthetic demo book</strong>, not a real bookmaker. They exist only to demonstrate the comparison panel.</Notice>}
       {priced.length === 0 ? (
-        <p className="muted small">No licensed price data is available for this match. We never invent bookmaker prices, and betPawa prices are not in our feed.</p>
+        <p className="muted small">No price data for this match.</p>
       ) : (
         <div className="table-scroll">
           <table className="dtable">
@@ -470,7 +467,6 @@ function OddsSection({ r, fixtureId }: { r: Report; fixtureId: string }) {
           </table>
         </div>
       )}
-      <p className="tiny muted">The model probability is computed independently and is shown separately from the price-implied probability. Implied probabilities include the bookmaker margin. This is not a recommendation to bet.</p>
     </section>
   );
 }
@@ -507,7 +503,6 @@ function ModelSection({ r }: { r: Report }) {
         <ul className="quality-legend">
           {["VERIFIED", "PARTIAL", "INSUFFICIENT", "STALE", "SIMULATED_DEMO"].map((s) => <li key={s}><QualityPill status={s} /></li>)}
         </ul>
-        <p className="tiny muted"><Info size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> When required records are missing we publish “Insufficient evidence” instead of a number.</p>
         <Unsupported list={r.unsupported} />
       </section>
     </>

@@ -499,8 +499,8 @@ def run(dataset: Dataset, catalog: dict, data_mode: str, now: datetime, seed: in
                                 "competition_training_matches": models.n_train,
                                 "data_as_of_at": iso(models.as_of) if models.as_of is not None else None},
                     "analysis": {
-                        "scoreline_matrix": None if point.ft is None else np.round(point.ft[:7, :7], 5).tolist(),
-                        "ht_matrix": None if point.ht is None else np.round(point.ht[:5, :5], 5).tolist(),
+                        "scoreline_matrix": None if point.ft is None else np.round(_fold(point.ft, 7), 5).tolist(),
+                        "ht_matrix": None if point.ht is None else np.round(_fold(point.ht, 5), 5).tolist(),
                         "corners_total_pmf": None if point.corners_total is None else np.round(point.corners_total[:21], 5).tolist(),
                         "cards_total_pmf": None if point.cards_total is None else np.round(point.cards_total[:12], 5).tolist(),
                     },
@@ -565,6 +565,15 @@ def run(dataset: Dataset, catalog: dict, data_mode: str, now: datetime, seed: in
         "evaluations": evaluations,
         "bookmaker_snapshots": odds,
     }
+
+
+def _fold(m: np.ndarray, k: int) -> np.ndarray:
+    """Display matrix k x k whose last row/column hold every score >= k-1 ("k-1+"), so it still sums to 1."""
+    out = m[:k, :k].copy()
+    out[k - 1, :] = m[k - 1 :, :k].sum(axis=0)
+    out[:, k - 1] = m[:k, k - 1 :].sum(axis=1)
+    out[k - 1, k - 1] = m[k - 1 :, k - 1 :].sum()
+    return out
 
 
 def _featured(probs: dict, baselines: dict) -> dict | None:

@@ -41,5 +41,35 @@
   },
   // Scheduled ingestion is defined but only does work when SPORTS_PROVIDER=api_football
   // and a key is configured; every upstream call goes through the shared D1 budget gateway.
-  "triggers": { "crons": ["15 */3 * * *"] }
+  "triggers": { "crons": ["15 */3 * * *"] },
+
+  // Hosted testing deployment (owner request 2026-10-20). Build with CLOUDFLARE_ENV=production.
+  // Free plan only: Workers Free + D1 free tier. Secrets via `wrangler secret put <NAME> --env production`.
+  "env": {
+    "production": {
+      "name": "bettipspro",
+      "d1_databases": [
+        { "binding": "DB", "database_name": "fip-prod", "database_id": "fe2844ec-a183-46ce-be58-0d83049f4ed9", "migrations_dir": "migrations" }
+      ],
+      "vars": {
+        "APP_ENV": "production",
+        "SPORTS_PROVIDER": "api_football",
+        "SPORTS_API_FREE_MODE": "true",
+        "SPORTS_API_DAILY_BUDGET": "80",
+        "SPORTS_API_DAILY_HARD_CAP": "100",
+        "SPORTS_API_PER_MINUTE_MAX": "10",
+        "AI_EXPLANATIONS_ENABLED": "true",
+        "AI_MONTHLY_BUDGET_USD": "10",
+        "PAYMENTS_ENABLED": "false",
+        "BETA_INVITE_ONLY": "true",
+        "MAX_BETA_USERS": "5",
+        "BETA_INITIAL_CREDITS": "10",
+        "BETA_CREDITS_EXPIRE": "false",
+        "PUBLIC_PERFORMANCE_ONLY_VERIFIED": "true",
+        "TURNSTILE_ENABLED": "false"
+      },
+      // Data is refreshed by the offline pipeline + authenticated import, so no cron in production.
+      "triggers": { "crons": [] }
+    }
+  }
 }

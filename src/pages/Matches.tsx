@@ -141,7 +141,9 @@ export default function Matches() {
   );
 }
 
-export function FixtureRow({ f, unlocked, showDate }: { f: FixtureSummary; unlocked: boolean; showDate?: boolean }) {
+export function FixtureRow({ f, unlocked: owned, showDate }: { f: FixtureSummary; unlocked: boolean; showDate?: boolean }) {
+  const { config } = useAuth();
+  const unlocked = owned || (!!config?.open_access && f.report.available);
   const finished = ["FT", "AET", "PEN"].includes(f.status);
   return (
     <li>
@@ -165,7 +167,7 @@ export function FixtureRow({ f, unlocked, showDate }: { f: FixtureSummary; unloc
             <span className="tiny muted">{f.report.available ? "Report ready" : "No report yet"}</span>
           )}
         </span>
-        <span className="fr-access" title={f.is_public_sample ? "Free sample report" : unlocked ? "Unlocked" : f.report.available ? "Full report: 1 credit" : "No report"}>
+        <span className="fr-access" title={f.is_public_sample ? "Free sample report" : config?.open_access && f.report.available ? "Open during testing" : unlocked ? "Unlocked" : f.report.available ? "Full report: 1 credit" : "No report"}>
           {f.is_public_sample ? <span className="pill pill-green">Free</span> : unlocked ? <Unlock size={18} color="#067a3e" /> : f.report.available ? <Lock size={17} className="muted" /> : null}
         </span>
       </Link>

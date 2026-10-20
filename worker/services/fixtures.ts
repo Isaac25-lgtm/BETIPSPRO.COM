@@ -35,7 +35,7 @@ export interface FixtureSummary {
   };
 }
 
-const FIXTURE_SELECT = `
+export const FIXTURE_SELECT = `
   SELECT f.id, f.starts_at_utc, f.status, f.round, f.home_goals, f.away_goals, f.home_goals_ht, f.away_goals_ht,
          f.is_synthetic, f.is_public_sample, f.venue_name, f.venue_city, f.referee_id, f.kickoff_confirmed, f.season,
          f.provider, f.provider_id, f.provider_last_updated, f.competition_id,
@@ -65,7 +65,7 @@ export function displayStatus(status: string, startsAt: string): string {
   return status;
 }
 
-function toSummary(r: FixtureRow): Omit<FixtureSummary, "featured"> {
+export function toSummary(r: FixtureRow): Omit<FixtureSummary, "featured"> {
   return {
     id: r.id,
     starts_at_utc: r.starts_at_utc,

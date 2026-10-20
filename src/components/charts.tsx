@@ -25,18 +25,28 @@ function useTip() {
 
 const pc = (v: number, d = 1) => `${(v * 100).toFixed(d)}%`;
 
-/** Sequential single-hue (green) scale, light -> dark. */
-function seq(t: number) {
-  const stops = ["#f1fbf5", "#c9f0d9", "#8fdcb2", "#44bd7f", "#139255", "#05633a"];
+/** Scoreline heatmap ramps: one hue per result region (home win / draw / away win), light -> dark by probability. */
+const RAMPS = {
+  home: ["#eefaf3", "#c6efd8", "#8edcb1", "#3fbb7c", "#0f8f52", "#05633a"],
+  draw: ["#fdf7ea", "#f8e5b8", "#efc76e", "#dba233", "#b27812", "#7d520a"],
+  away: ["#eef3fd", "#c9d8f8", "#93b2ef", "#5583e0", "#2f5fc4", "#1c3f8f"],
+} as const;
+
+function ramp(stops: readonly string[], t: number) {
   const x = Math.max(0, Math.min(1, t)) * (stops.length - 1);
-  const i = Math.floor(x);
-  return stops[Math.min(i + (x - i > 0.5 ? 1 : 0), stops.length - 1)];
+  const i = Math.min(Math.floor(x), stops.length - 2);
+  const f = x - i;
+  const a = stops[i], b = stops[i + 1];
+  const mix = (k: number) => Math.round(parseInt(a.slice(k, k + 2), 16) * (1 - f) + parseInt(b.slice(k, k + 2), 16) * f).toString(16).padStart(2, "0");
+  return `#${mix(1)}${mix(3)}${mix(5)}`;
 }
 
 export function ScorelineHeatmap({ matrix, home, away, title }: { matrix: number[][]; home: string; away: string; title: string }) {
   const { bind, node } = useTip();
   const max = Math.max(...matrix.flat());
   const n = matrix.length;
+  let ph = 0, pd = 0, pa = 0;
+  matrix.forEach((row, h) => row.forEach((v, a) => { if (h > a) ph += v; else if (h === a) pd += v; else pa += v; }));
   return (
     <figure className="chart heatmap">
       <figcaption className="chart-title">{title}</figcaption>
@@ -53,7 +63,12 @@ export function ScorelineHeatmap({ matrix, home, away, title }: { matrix: number
           </div>
         </div>
       </div>
-      <p className="chart-note">Cells show the model's probability of each exact score (regulation time). Darker = more likely.</p>
+      <div className="hm-legend">
+        <span><i style={{ background: RAMPS.home[4] }} />{home} win <b className="num">{pc(ph, 0)}</b></span>
+        <span><i style={{ background: RAMPS.draw[3] }} />Draw <b className="num">{pc(pd, 0)}</b></span>
+        <span><i style={{ background: RAMPS.away[4] }} />{away} win <b className="num">{pc(pa, 0)}</b></span>
+        <span className="muted">Darker = more likely</span>
+      </div>
       <table className="sr-only">
         <caption>{title}</caption>
         <tbody>{matrix.map((row, h) => <tr key={h}>{row.map((v, a) => <td key={a}>{`${h}-${a}: ${pc(v)}`}</td>)}</tr>)}</tbody>
@@ -68,9 +83,10 @@ function Row({ h, n, row, max, bind, home, away }: { h: number; n: number; row: 
     <>
       <span className="hm-axis">{h === n - 1 ? `${h}+` : h}</span>
       {row.map((v, a) => {
-        const t = v / max;
+        const t = Math.sqrt(v / max);
+        const stops = h > a ? RAMPS.home : h === a ? RAMPS.draw : RAMPS.away;
         return (
-          <span key={a} className="hm-cell" style={{ background: seq(t), color: t > 0.55 ? "#fff" : "#10202f" }} {...bind(<><strong>{home} {h} - {a} {away}</strong><br />Model probability {pc(v)}</>)}>
+          <span key={a} className="hm-cell" style={{ background: ramp(stops, t), color: t > 0.62 ? "#fff" : "#10202f" }} {...bind(<><strong>{home} {h} - {a} {away}</strong><br />Model probability {pc(v)}</>)}>
             {(v * 100).toFixed(v >= 0.1 ? 0 : 1)}
           </span>
         );
@@ -135,7 +151,7 @@ export function TwoSeriesHistogram({ a, b, aLabel, bLabel, statLabel, title, thr
           </div>
         ))}
       </div>
-      <p className="chart-note">Counts of actual matches in each team&apos;s last 10 (observed, not model output).{threshold != null ? ` Shaded columns are above ${threshold}.` : ""}</p>
+      <p className="chart-note">Each team&apos;s last 10 matches.{threshold != null ? ` Shaded columns are above ${threshold}.` : ""}</p>
       <table className="sr-only"><caption>{title}</caption><thead><tr><th>{statLabel}</th><th>{aLabel}</th><th>{bLabel}</th></tr></thead><tbody>{full.map((k) => <tr key={k}><td>{k}</td><td>{a[k] ?? 0}</td><td>{b[k] ?? 0}</td></tr>)}</tbody></table>
       {node}
     </figure>

@@ -28,3 +28,6 @@ public/images/local/
 # Research harness outputs (per-match predictions; regenerate with model-pipeline/research/run_*.py)
 model-pipeline/research/out/
 model-pipeline/research/*.pkl
+
+# Production admin credentials (local only)
+prod-admin.local.txt

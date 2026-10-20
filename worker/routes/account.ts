@@ -10,6 +10,7 @@ import {
   bootstrapAdmin, checkRateLimit, createSession, login, recordAttempt, redeemInvite, revokeAllSessions, revokeSession, SESSION_COOKIE, sessionCookie,
 } from "../services/auth.ts";
 import { ENTITLEMENT_SCOPE, getBalance, hasEntitlement, unlockReport } from "../services/credits.ts";
+import { openAccess } from "../services/access.ts";
 import { fullReport, marketEvidence } from "../services/evidence.ts";
 import { cached } from "../services/cache.ts";
 import { cachedSummary } from "../services/ai/gemini.ts";
@@ -145,13 +146,15 @@ accountRoutes.post("/me/data-request", async (c) => {
 
 // ------------------------------------------------------------------ reports & evidence
 
-async function canView(c: Context<AppBindings>, fixtureId: string): Promise<"sample" | "admin" | "entitled"> {
+async function canView(c: Context<AppBindings>, fixtureId: string): Promise<"sample" | "admin" | "entitled" | "open"> {
   const f = await c.env.DB.prepare("SELECT is_public_sample FROM fixtures WHERE id = ?").bind(fixtureId).first<{ is_public_sample: number }>();
   if (!f) throw new ApiError(404, "NOT_FOUND", "Fixture not found.");
   if (f.is_public_sample) return "sample";
   const u = c.get("user");
+  if (u?.role === "admin") return "admin";
+  // Testing phase: everyone can read every report without credits (D-026).
+  if (await openAccess(c.env)) return "open";
   if (!u) throw new ApiError(401, "UNAUTHENTICATED", "Sign in to view this report.");
-  if (u.role === "admin") return "admin";
   if (await hasEntitlement(c.env, u.id, fixtureId)) return "entitled";
   throw new ApiError(403, "REPORT_LOCKED", "Unlock this match report to view its full analysis (1 credit; all markets included).", { balance: await getBalance(c.env, u.id) });
 }

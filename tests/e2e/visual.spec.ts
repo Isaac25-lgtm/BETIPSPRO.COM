@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 const VIEWPORTS = [
   [1536, 1024], [1280, 800], [1024, 768], [768, 1024], [430, 932], [414, 896], [390, 844], [360, 780], [320, 640], [844, 390],
 ] as const;
-const PAGES = [["home", "/"], ["matches", "/matches"], ["leagues", "/leagues"], ["statistics", "/statistics"], ["archive", "/predictions/archive"], ["how", "/research/how-it-works"], ["login", "/login"], ["join", "/join"]] as const;
+const PAGES = [["home", "/"], ["matches", "/matches"], ["leagues", "/leagues"], ["statistics", "/statistics"], ["archive", "/predictions/archive"], ["how", "/research/how-it-works"], ["report", "/report"], ["login", "/login"], ["join", "/join"]] as const;
 
 for (const [w, h] of VIEWPORTS) {
   test(`no horizontal overflow at ${w}x${h}`, async ({ page }) => {

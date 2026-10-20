@@ -4,6 +4,7 @@
  */
 import { readdirSync, readFileSync, rmSync } from "node:fs";
 import { getPlatformProxy } from "wrangler";
+import { resetAccessCache } from "../../worker/services/access.ts";
 import { app } from "../../worker/index.ts";
 import type { Env } from "../../worker/env.ts";
 import { artifactRequests, importSection, ImportRequestSchema, shiftArtifact, type Artifact } from "../../worker/services/importer.ts";
@@ -33,7 +34,7 @@ export interface TestCtx {
 }
 
 let counter = 0;
-export async function createTestEnv(opts: { seed?: boolean; vars?: Partial<Env> } = {}): Promise<TestCtx> {
+export async function createTestEnv(opts: { seed?: boolean; vars?: Partial<Env>; openAccess?: boolean } = {}): Promise<TestCtx> {
   const dir = `.wrangler/test-state/${process.pid}-${Date.now()}-${counter++}`;
   const proxy = await getPlatformProxy<Env>({ configPath: "wrangler.jsonc", persist: { path: dir } });
   // Tests never use the developer's real provider key from .dev.vars; they opt in explicitly via opts.vars.
@@ -43,6 +44,9 @@ export async function createTestEnv(opts: { seed?: boolean; vars?: Partial<Env> 
     for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50).map((s) => env.DB.prepare(s)));
   }
   if (opts.seed) await seedDemo(env);
+  // Most tests exercise the credit/lock flow, so open access (testing-phase default) is off unless asked for.
+  await env.DB.prepare("UPDATE app_config SET value_json = ? WHERE key = 'access'").bind(JSON.stringify({ open: !!opts.openAccess })).run();
+  resetAccessCache();
   const call: TestCtx["call"] = async (path, init = {}) => {
     const headers = new Headers(init.headers);
     if (init.cookie) headers.set("cookie", init.cookie);

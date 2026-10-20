@@ -124,7 +124,7 @@ export default function Matches() {
           {groups.map((g) => (
             <section key={g.comp.id} className="card fixture-group" aria-label={g.comp.name}>
               <header className="fg-head">
-                <CompMark name={g.comp.name} synthetic={g.comp.is_synthetic} />
+                <CompMark name={g.comp.name} id={g.comp.id} synthetic={g.comp.is_synthetic} />
                 <Link to={`/leagues/${encodeURIComponent(g.comp.id)}`} className="fg-title">{g.comp.name}</Link>
                 {!g.comp.is_synthetic && <span className="muted small">{g.comp.country}</span>}
                 <span className="spacer" />

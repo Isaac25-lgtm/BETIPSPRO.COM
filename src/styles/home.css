@@ -373,3 +373,19 @@
 .lt-tag { display: inline-flex; align-items: center; gap: 6px; justify-self: start; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.92); }
 .lt-tag i { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.7); }
 @media (max-width: 560px) { .league-tile-photo .lt-inner { padding-left: 40%; } .league-tile-photo .lt-title { font-size: 17px; } }
+
+/* Phones: light, natural hero copy under the photo band (owner preference 2026-10-20: natural over dark). */
+@media (max-width: 767px) {
+  .hero { background: linear-gradient(180deg, #ffffff 0%, var(--page) 100%); color: var(--text); border-bottom: 1px solid var(--line); }
+  .hero-art::after { background: linear-gradient(180deg, rgba(255,255,255,0) 62%, #ffffff 100%); }
+  .hero-title { color: var(--navy-950); text-shadow: none; }
+  .hero-title .hl { color: var(--accent-ink); }
+  .hero-lede { color: var(--text-2); text-shadow: none; }
+  .hero-eyebrow { color: var(--muted); }
+  .hero-secondary { color: var(--navy-950); opacity: 1; text-shadow: none; }
+  .hero-cta { box-shadow: 0 6px 18px rgba(2, 172, 79, .22); }
+  .hero-stats { border-top-color: var(--line); }
+  .hero-stats > div { border-left-color: var(--line); }
+  .hero-stats dd { color: var(--navy-950); }
+  .hero-stats dt { color: var(--muted); }
+}

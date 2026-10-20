@@ -1,3 +1,5 @@
+> **MUST DO before payments / commercial launch (D-029):** remove the testing-phase reference assets: delete `VITE_LOCAL_REFERENCE_HERO=true` from `.env.local`, rebuild (`CLOUDFLARE_ENV=production npx vite build`) and redeploy, confirm no `/images/local/` or `/crests/` files in `dist/client`, then replace with licensed imagery. Remove the testing noindex lines from `public/_headers` and `public/robots.txt` only once licensed art is live.
+
 # Release checklist & gates
 
 ## Gates (all OPEN; each needs explicit owner sign-off)

@@ -41,7 +41,7 @@ function LeagueCard({ c }: { c: Comp }) {
   return (
     <Link to={`/leagues/${encodeURIComponent(c.id)}`} className="card card-pad league-card">
       <div className="row">
-        <CompMark name={c.name} synthetic={c.is_synthetic} />
+        <CompMark name={c.name} id={c.id} synthetic={c.is_synthetic} />
         <div className="spacer"><strong>{c.name}</strong><div className="tiny muted">{c.country}{c.current_season ? ` · ${c.current_season}` : ""}</div></div>
         {c.is_synthetic ? <DemoPill /> : c.completed > 0 ? <span className="pill pill-green">Data loaded</span> : <span className="pill pill-gray">Awaiting data</span>}
       </div>
@@ -67,7 +67,7 @@ export function LeagueDetail() {
     <div className="container">
       <div className="page-head">
         <nav className="breadcrumbs"><Link to="/leagues">Leagues</Link><span>/</span><span>{c.name}</span></nav>
-        <div className="row"><CompMark name={c.name} synthetic={c.is_synthetic} /><h1>{c.name}</h1>{c.is_synthetic && <DemoPill />}</div>
+        <div className="row"><CompMark name={c.name} id={c.id} synthetic={c.is_synthetic} /><h1>{c.name}</h1>{c.is_synthetic && <DemoPill />}</div>
         <p className="muted">{c.country}{c.current_season ? ` · season ${c.current_season}` : ""}</p>
       </div>
       {!c.is_synthetic && data.standings.length === 0 && (

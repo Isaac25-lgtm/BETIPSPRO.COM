@@ -9,11 +9,10 @@ import type { FixtureList, FixtureSummary, Report } from "../lib/types";
 import { CompMark, DemoPill, ErrorState, ProbBar, Skeleton, TeamBadge, teamLabel } from "../components/ui";
 
 /**
- * LOCAL-ONLY preview hero cut from the owner's reference screenshot (real players + sponsor logos).
- * Enabled only in `vite dev` with VITE_LOCAL_REFERENCE_HERO=true in .env.local; the images are
- * gitignored and stripped from production builds. Replace with a licensed photo before launch.
+ * TESTING-PHASE reference hero and league tiles (real players + league logos from the owner's reference
+ * screenshot), on when VITE_LOCAL_REFERENCE_HERO=true. The owner will remove them before payments (D-029).
  */
-const LOCAL_REFERENCE_HERO = import.meta.env.DEV && import.meta.env.VITE_LOCAL_REFERENCE_HERO === "true";
+const LOCAL_REFERENCE_HERO = import.meta.env.VITE_LOCAL_REFERENCE_HERO === "true";
 
 const eatYmdOf = (iso: string) => eatYmd(new Date(iso));
 
@@ -210,7 +209,7 @@ function InsightRow({ f, showOdds }: { f: FixtureSummary; showOdds: boolean }) {
       </td>
       <td>
         <span className="league-cell" title={f.competition.name}>
-          <CompMark name={f.competition.name} synthetic={f.competition.is_synthetic} />
+          <CompMark name={f.competition.name} id={f.competition.id} synthetic={f.competition.is_synthetic} />
           <span className="league-name">{f.competition.short_name}</span>
         </span>
       </td>
@@ -224,7 +223,7 @@ function InsightCard({ f, showOdds }: { f: FixtureSummary; showOdds: boolean }) 
     <li>
       <Link to={`/matches/${encodeURIComponent(f.id)}`} className="insight-card">
         <div className="ic-top">
-          <span className="league-cell small"><CompMark name={f.competition.name} synthetic={f.competition.is_synthetic} /> {f.competition.short_name}</span>
+          <span className="league-cell small"><CompMark name={f.competition.name} id={f.competition.id} synthetic={f.competition.is_synthetic} /> {f.competition.short_name}</span>
           <span className="num ic-time">{eatYmdOf(f.starts_at_utc) === eatYmd() ? kickoffTime(f.starts_at_utc) : `${kickoffDate(f.starts_at_utc, { weekday: "short" })} ${kickoffTime(f.starts_at_utc)}`}</span>
         </div>
         <div className="ic-teams">

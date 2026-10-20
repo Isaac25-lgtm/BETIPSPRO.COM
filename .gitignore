@@ -34,5 +34,4 @@ prod-admin.local.txt
 
 # Downloaded crests awaiting owner permission to publish (D-028)
 public/crests/
-src/lib/crest-manifest.json
 .crests-pending/

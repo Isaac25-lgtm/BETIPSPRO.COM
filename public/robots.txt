@@ -1,0 +1,3 @@
+# Testing phase: not for indexing (D-029)
+User-agent: *
+Disallow: /

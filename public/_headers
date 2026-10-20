@@ -1,3 +1,7 @@
+# Testing phase: keep every page out of search engines (D-029).
+/*
+  X-Robots-Tag: noindex, nofollow
+
 # Static asset caching (Cloudflare Workers static assets honour this file).
 # Hashed build output never changes, so browsers and the edge may keep it for a year.
 /assets/*

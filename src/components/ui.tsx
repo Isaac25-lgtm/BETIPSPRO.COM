@@ -1,4 +1,9 @@
 import type { ReactNode } from "react";
+import CRESTS from "../lib/crest-manifest.json";
+
+// Real crests are testing-phase reference assets (D-029); a missing file falls back to the monogram next render.
+const REFERENCE_ASSETS = import.meta.env.VITE_LOCAL_REFERENCE_HERO === "true";
+const failedCrests = new Set<string>();
 import { AlertTriangle, FlaskConical, Info, Lock } from "lucide-react";
 import { brand } from "../../shared/brand";
 import { initials, qualityLabel } from "../lib/format";
@@ -32,8 +37,16 @@ export function Logo({ compact = false, dark = true }: { compact?: boolean; dark
   );
 }
 
-/** Clean circular monogram from team colours. No club crests are used (rights not cleared). */
-export function TeamBadge({ team, size = 32 }: { team: Pick<TeamRef, "name" | "primary_color" | "secondary_color" | "code">; size?: number }) {
+/** Real club crest when we hold one (public/crests, see scripts/fetch-crests.py), else a monogram from team colours. */
+export function TeamBadge({ team, size = 32 }: { team: Pick<TeamRef, "name" | "primary_color" | "secondary_color" | "code"> & { id?: string }; size?: number }) {
+  const crest = REFERENCE_ASSETS && team.id ? (CRESTS.teams as Record<string, string>)[team.id] : undefined;
+  if (crest && !failedCrests.has(crest)) {
+    return (
+      <span className="team-badge crest" style={{ width: size, height: size }} aria-hidden="true">
+        <img src={crest} alt="" width={size} height={size} loading="lazy" decoding="async" onError={(e) => { failedCrests.add(crest); (e.currentTarget.parentElement as HTMLElement).style.visibility = "hidden"; }} />
+      </span>
+    );
+  }
   const c1 = team.primary_color ?? "#334155";
   const c2 = team.secondary_color ?? "#ffffff";
   const light = isLight(c1);
@@ -72,8 +85,16 @@ function isLight(hex: string) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 186;
 }
 
-/** Neutral competition marker: quiet initials tile (no league emblems are used). */
-export function CompMark({ name }: { name: string; synthetic?: boolean }) {
+/** Competition emblem when we hold one, else a quiet initials tile. */
+export function CompMark({ name, id }: { name: string; id?: string; synthetic?: boolean }) {
+  const emblem = REFERENCE_ASSETS && id ? (CRESTS.comps as Record<string, string>)[id] : undefined;
+  if (emblem) {
+    return (
+      <span className="comp-mark comp-emblem" aria-hidden="true">
+        <img src={emblem} alt="" width={20} height={20} loading="lazy" decoding="async" />
+      </span>
+    );
+  }
   return (
     <span className="comp-mark" aria-hidden="true">
       {initials(name.replace(/^Demo\s+/, ""))}

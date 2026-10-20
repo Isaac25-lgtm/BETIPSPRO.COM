@@ -8,7 +8,7 @@
  */
 export const BANNED = [
   /guarantee/i, /sure (win|bet|odds|thing)/i, /fixed match/i, /risk[- ]free/i, /\block\b/i, /banker/i, /can'?t lose/i,
-  /must bet/i, /bet now/i, /easy money/i, /profit(able)? (tip|guaranteed)/i, /100% (win|certain)/i, /certain(ly)? (win|happen)/i,
+  /must bet/i, /bet now/i, /easy money/i, /hit(?:s|ting)? the (?:over|under)/i, /value bet/i, /\bthe (?:over|under)\b(?!all)/i, /\bpunt(?:s|ers?)?\b/i, /\bstakes?\b/i, /profit(able)? (tip|guaranteed)/i, /100% (win|certain)/i, /certain(ly)? (win|happen)/i,
 ];
 const TACTICAL = [/pressing/i, /formation/i, /overlap/i, /high line/i, /counter[- ]attack/i, /possession-based/i, /set[- ]piece routine/i];
 

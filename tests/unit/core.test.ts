@@ -55,6 +55,13 @@ describe("AI guardrails", () => {
     const v = validateSummary("The model estimates 21% while 6 of 8 recent home matches (75%) went under; league rate 43%.", allowedNumbers(evidence));
     expect(v.ok).toBe(true);
   });
+  it("rejects betting slang but not ordinary words that contain it", () => {
+    const allowed = allowedNumbers(evidence);
+    expect(validateSummary("A good chance of hitting the over.", allowed).ok).toBe(false);
+    expect(validateSummary("Punters may like the under here.", allowed).ok).toBe(false);
+    expect(validateSummary("Small stake, value bet.", allowed).ok).toBe(false);
+    expect(validateSummary("The overall picture is mixed; one defensive mistake changed the outcome.", allowed).ok).toBe(true);
+  });
   it("rejects invented numbers, certainty language and tactical claims", () => {
     expect(validateSummary("Expect 68% win rate.", allowedNumbers(evidence)).ok).toBe(false);
     expect(validateSummary("This is a guaranteed lock.", allowedNumbers(evidence)).ok).toBe(false);

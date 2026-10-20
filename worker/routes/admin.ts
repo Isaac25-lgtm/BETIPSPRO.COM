@@ -277,6 +277,37 @@ adminRoutes.put("/config/ingestion", async (c) => {
   return ok(c, { saved: b });
 });
 
+/** Offline AI batch support: month-to-date spend + which summaries already exist (so nothing is regenerated). */
+adminRoutes.get("/ai/status", async (c) => {
+  const start = nowIso().slice(0, 7) + "-01T00:00:00Z";
+  const [spend, existing] = await c.env.DB.batch<Record<string, unknown>>([
+    c.env.DB.prepare("SELECT COALESCE(SUM(cost_usd), 0) AS usd, COUNT(*) AS n FROM ai_explanations WHERE created_at >= ?").bind(start),
+    c.env.DB.prepare("SELECT fixture_id, market_definition_id, report_version, evidence_hash FROM ai_explanations ORDER BY created_at DESC LIMIT 5000"),
+  ]);
+  return ok(c, { month_start: start, month_spend_usd: spend.results[0]?.usd ?? 0, month_items: spend.results[0]?.n ?? 0, existing: existing.results });
+});
+
+/** Import summaries produced by scripts/ai-summaries.mjs (Vertex via the owner's Google login; no API keys). */
+adminRoutes.post("/ai/import", async (c) => {
+  const b = await body(c, z.object({
+    rows: z.array(z.object({
+      fixture_id: z.string().max(160), market_id: z.string().max(80), report_version: z.string().max(160), evidence_hash: z.string().max(100),
+      model: z.string().max(80), text_json: z.string().max(20000), input_tokens: z.number().int().nonnegative(), output_tokens: z.number().int().nonnegative(),
+      cost_usd: z.number().nonnegative().max(5),
+    })).max(200),
+  }));
+  let written = 0;
+  for (const r of b.rows) {
+    const res = await c.env.DB.prepare(
+      "INSERT OR IGNORE INTO ai_explanations (id, fixture_id, market_definition_id, report_version, evidence_hash, model, text_json, input_tokens, output_tokens, cost_usd, created_at) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM fixtures WHERE id = ?)",
+    ).bind(newId("ai"), r.fixture_id, r.market_id, r.report_version, r.evidence_hash, r.model, r.text_json, r.input_tokens, r.output_tokens, r.cost_usd, nowIso(), r.fixture_id).run();
+    written += res.meta.changes ?? 0;
+  }
+  bumpCacheGeneration();
+  await audit(c, "ai.import", "ai_explanations", null, { rows: b.rows.length, written, cost_usd: b.rows.reduce((s, r) => s + r.cost_usd, 0) });
+  return ok(c, { received: b.rows.length, written });
+});
+
 adminRoutes.post("/ai/generate", async (c) => {
   const b = await body(c, z.object({ fixture_id: z.string().max(160), market_id: z.string().max(80) }));
   const ev = await marketEvidence(c.env, b.fixture_id, b.market_id);

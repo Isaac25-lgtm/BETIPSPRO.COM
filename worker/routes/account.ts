@@ -182,7 +182,7 @@ accountRoutes.get("/fixtures/:id/markets/:marketId/evidence", async (c) => {
   const v = await c.env.DB.prepare("SELECT report_version FROM match_reports WHERE fixture_id = ? ORDER BY generated_at DESC LIMIT 1").bind(id).first<{ report_version: string }>();
   if (!v) throw new ApiError(409, "REPORT_UNAVAILABLE", "No report has been prepared for this fixture.");
   const { value, hit } = await cached(`evidence:${id}:${marketId}:${v.report_version}`, 600, () => marketEvidence(c.env, id, marketId));
-  const ai = await cachedSummary(c.env, id, marketId, v.report_version);
+  const ai = c.env.AI_EXPLANATIONS_ENABLED === "true" ? await cachedSummary(c.env, id, marketId, v.report_version) : null;
   c.header("X-Cache", hit);
   return ok(c, { ...value, ai_summary: ai, access });
 });

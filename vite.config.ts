@@ -27,5 +27,7 @@ export default defineConfig({
       },
     },
   },
-  server: { port: Number(process.env.PORT ?? 5173), strictPort: true },
+  // Bind IPv4 loopback explicitly (Windows otherwise listens on ::1 only, which some VPNs/proxies
+  // and debuggers cannot reach) and disable browser caching so every reload shows the latest build.
+  server: { host: "127.0.0.1", port: Number(process.env.PORT ?? 5173), strictPort: true, headers: { "Cache-Control": "no-store" } },
 });

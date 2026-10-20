@@ -36,12 +36,13 @@ export async function reportOverview(env: Env) {
   const probs = new Map<string, Map<string, { p: number | null; unc: string; reason: string | null }>>();
   const priced = new Map<string, number>();
   const summaries = new Set<string>();
+  const featured = new Map<string, number | null>();
   if (fixtures.length) {
     const latest = `SELECT r.fixture_id, r.report_version FROM match_reports r
                       JOIN fixtures f ON f.id = r.fixture_id
                      WHERE f.status IN ('NS','TBD') AND f.starts_at_utc > ?1
                        AND r.generated_at = (SELECT MAX(generated_at) FROM match_reports WHERE fixture_id = r.fixture_id)`;
-    const [fc, cnt, ai] = await env.DB.batch<Record<string, unknown>>([
+    const [fc, cnt, ai, fe] = await env.DB.batch<Record<string, unknown>>([
       env.DB.prepare(
         `SELECT fo.fixture_id, fo.market_definition_id AS m, fo.probability AS p, fo.uncertainty_json AS unc, fo.quality_reason AS reason
            FROM forecasts fo JOIN (${latest}) l ON l.fixture_id = fo.fixture_id AND l.report_version = fo.model_run_id
@@ -55,7 +56,12 @@ export async function reportOverview(env: Env) {
         `SELECT DISTINCT x.fixture_id FROM ai_explanations x JOIN (${latest}) l ON l.fixture_id = x.fixture_id AND l.report_version = x.report_version
           WHERE x.text_json NOT LIKE '%"rejected":true%'`,
       ).bind(now),
+      env.DB.prepare(
+        `SELECT fo.fixture_id, fo.probability AS p FROM forecasts fo JOIN (${latest}) l ON l.fixture_id = fo.fixture_id AND l.report_version = fo.model_run_id
+           JOIN match_reports r ON r.fixture_id = fo.fixture_id AND r.report_version = l.report_version AND r.featured_market_id = fo.market_definition_id`,
+      ).bind(now),
     ]);
+    for (const r of fe.results) featured.set(r.fixture_id as string, r.p as number | null);
     for (const r of fc.results) {
       const id = r.fixture_id as string;
       if (!probs.has(id)) probs.set(id, new Map());
@@ -76,7 +82,7 @@ export async function reportOverview(env: Env) {
     } catch { /* no interval */ }
     const show = open || !!r.is_public_sample;
     const fm = r.featured_market_id ? marketById.get(r.featured_market_id) : undefined;
-    const featuredP = r.featured_market_id ? (m?.get(r.featured_market_id)?.p ?? null) : null;
+    const featuredP = r.featured_market_id ? (m?.get(r.featured_market_id)?.p ?? featured.get(r.id) ?? null) : null;
     return {
       ...toSummary(r),
       featured: fm ? { market_id: fm.id, label: fm.label, probability: show ? featuredP : null } : null,

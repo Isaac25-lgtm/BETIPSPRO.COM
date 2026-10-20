@@ -367,3 +367,5 @@ cd model-pipeline && python -m pip install -e ".[dev]"   # numpy, scipy, pandas,
 - **Charts**: model vs league average, total goals distribution, form timeline (`src/components/charts.tsx`). Meters: green >= 65%, amber 40-65%, red < 40%.
 - **Performance** (D-028): Smart Placement, migration 0005 indexes, cache TTLs, immutable assets. Measure with `node tests/performance/latency.mjs <url>`.
 - **Code review** by another agent: `docs/reviews/2026-10-20-code-and-model-review.md`.
+
+- **Review fixes (D-031):** see `docs/reviews/2026-10-20-fixes.md` for every finding's status. Assistant answers are verified against tool results; DeepSeek spend is reserved per call (`assistant_spend`, $3/day, $30/month). Settlement runs daily (`POST /admin/settle`).

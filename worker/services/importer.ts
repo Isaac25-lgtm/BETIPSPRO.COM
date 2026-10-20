@@ -8,14 +8,18 @@
  * Guarantees:
  *  - Forecast rows are INSERT OR IGNORE: an existing forecast is never rewritten
  *    (a DB trigger also blocks UPDATEs of probability/timestamps).
- *  - A pre-kickoff forecast must have data_as_of_at < kickoff AND generated_at < kickoff.
+ *  - A pre-kickoff forecast must have data_as_of_at < kickoff AND generated_at < kickoff AND be stored by the
+ *    server before kickoff (server clock, recorded as published_at; R-03). Late live rows are rejected.
  *  - Backtest rows are stored with is_pre_kickoff = 0 so they can never masquerade as
  *    published predictions.
  */
 import { z } from "zod";
 import { catalog, marketById } from "../../shared/markets.ts";
 
-const iso = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/, "must be an ISO-8601 UTC timestamp");
+const iso = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/, "must be an ISO-8601 UTC timestamp")
+  .refine((v) => { const t = Date.parse(v); return Number.isFinite(t) && new Date(t).toISOString().slice(0, 19) === v.slice(0, 19); }, "must be a real calendar date and time");
+const ms = (v: string) => Date.parse(v);
 const id = z.string().min(1).max(160);
 const nint = z.number().int().nullable().optional();
 
@@ -56,7 +60,9 @@ const TeamStatSchema = z.object({
   fixture_id: id, team_id: id, corners: nint, yellow_cards: nint, red_cards: nint, shots: nint, shots_on_target: nint,
   possession_pct: z.number().nullable().optional(), xg: z.number().nullable().optional(),
 });
-const Uncertainty = z.object({ p05: z.number(), p95: z.number(), method: z.string(), note: z.string().optional() }).partial();
+const Uncertainty = z.object({ p05: z.number().min(0).max(1), p95: z.number().min(0).max(1), method: z.string(), note: z.string().optional(), unavailable: z.string().optional() })
+  .partial()
+  .refine((u) => u.p05 == null || u.p95 == null || u.p05 <= u.p95, "uncertainty range must satisfy p05 <= p95");
 const ForecastSchema = z.object({
   fixture_id: id, market_id: id, probability: z.number().min(0).max(1).nullable(),
   status: z.enum(["VERIFIED", "PARTIAL", "INSUFFICIENT", "STALE", "SIMULATED_DEMO", "RESEARCH"]),
@@ -109,6 +115,8 @@ export interface ImportResult {
   received: number;
   written: number;
   rejected: Array<{ index: number; reason: string }>;
+  /** Live rows stored after kickoff (server clock): kept, but never marked as published before kickoff. */
+  late?: number;
 }
 
 type Row = Record<string, unknown>;
@@ -230,18 +238,22 @@ export async function importSection(db: D1Database, req: ImportRequest, ctx: Imp
         if (!kickoff) return result.rejected.push({ index, reason: "unknown fixture" });
         if (!marketById.has(r.market_id)) return result.rejected.push({ index, reason: "unknown market" });
         const asOf = (r as { data_as_of_at?: string | null }).data_as_of_at ?? run.data_as_of_at;
-        if (asOf >= kickoff) return result.rejected.push({ index, reason: "data_as_of_at is not before kickoff (leakage)" });
-        if (!isArchive && run.generated_at >= kickoff) return result.rejected.push({ index, reason: "forecast generated after kickoff cannot be stored as pre-kickoff" });
+        if (ms(asOf) >= ms(kickoff)) return result.rejected.push({ index, reason: "data_as_of_at is not before kickoff (leakage)" });
+        if (!isArchive && ms(run.generated_at) >= ms(kickoff)) return result.rejected.push({ index, reason: "forecast generated after kickoff cannot be stored as pre-kickoff" });
+        // R-03: "pre-kickoff" means the SERVER stored the row before kickoff. A late row is kept for the record but can
+        // never count as a published pre-kickoff forecast, whatever timestamps the artifact claims.
+        const late = !isArchive && ms(ctx.now) >= ms(kickoff);
+        if (late) result.late = (result.late ?? 0) + 1;
         if (r.status === "INSUFFICIENT" && r.probability !== null) return result.rejected.push({ index, reason: "INSUFFICIENT forecasts must not carry a probability" });
         const unc = isArchive ? {} : (r as { uncertainty: unknown }).uncertainty;
         data.push([
-          `fc_${runId.replace(/[^a-zA-Z0-9]/g, "").slice(-24)}_${r.fixture_id}_${r.market_id}`, r.fixture_id, r.market_id, runId, r.probability,
+          `fc_${runId.replace(/[^a-zA-Z0-9]/g, "")}_${r.fixture_id}_${r.market_id}`, r.fixture_id, r.market_id, runId, r.probability,
           run.model_version, run.generated_at, asOf, run.dataset_hash, r.status, r.quality_reason, JSON.stringify(unc),
-          isArchive ? 0 : 1, isArchive ? (r as { settled_outcome: number | null }).settled_outcome : null, isArchive ? ctx.now : null,
+          isArchive || late ? 0 : 1, isArchive ? (r as { settled_outcome: number | null }).settled_outcome : null, isArchive ? ctx.now : null, ctx.now,
         ]);
       });
       result.written = await runBatches(db, insertMany(db, "INSERT OR IGNORE", "forecasts",
-        ["id", "fixture_id", "market_definition_id", "model_run_id", "probability", "model_version", "generated_at", "data_as_of_at", "dataset_hash", "status", "quality_reason", "uncertainty_json", "is_pre_kickoff", "settled_outcome", "settled_at"],
+        ["id", "fixture_id", "market_definition_id", "model_run_id", "probability", "model_version", "generated_at", "data_as_of_at", "dataset_hash", "status", "quality_reason", "uncertainty_json", "is_pre_kickoff", "settled_outcome", "settled_at", "published_at"],
         data));
       return result;
     }
@@ -249,7 +261,7 @@ export async function importSection(db: D1Database, req: ImportRequest, ctx: Imp
       result.received = req.rows.length;
       result.written = await runBatches(db, insertMany(db, "INSERT OR IGNORE", "forecast_evidence",
         ["id", "fixture_id", "model_run_id", "model_family", "metric", "value", "value_json", "sample_window", "source_ref", "captured_at"],
-        req.rows.map((r) => [`fe_${req.model_run_id.replace(/[^a-zA-Z0-9]/g, "").slice(-24)}_${r.fixture_id}_${r.model_family}_${r.metric}`, r.fixture_id, req.model_run_id, r.model_family, r.metric, r.value,
+        req.rows.map((r) => [`fe_${req.model_run_id.replace(/[^a-zA-Z0-9]/g, "")}_${r.fixture_id}_${r.model_family}_${r.metric}`, r.fixture_id, req.model_run_id, r.model_family, r.metric, r.value,
           r.value_json == null ? null : JSON.stringify(r.value_json), r.sample_window ?? null, r.source_ref ?? null, ctx.now])));
       return result;
     }
@@ -259,7 +271,7 @@ export async function importSection(db: D1Database, req: ImportRequest, ctx: Imp
       if (!run) throw new Error(`unknown model run ${req.model_run_id}`);
       result.written = await runBatches(db, insertMany(db, "INSERT OR IGNORE", "match_reports",
         ["id", "fixture_id", "report_version", "model_run_id", "report_status", "featured_market_id", "summary_json", "analysis_json", "evidence_manifest_json", "generated_at"],
-        req.rows.map((r) => [`mr_${r.fixture_id}_${run.id.slice(-16)}`, r.fixture_id, run.id, run.id, run.data_mode === "SIMULATED_DEMO" ? "SIMULATED_DEMO" : "PUBLISHED",
+        req.rows.map((r) => [`mr_${r.fixture_id}_${run.id.replace(/[^a-zA-Z0-9]/g, "")}`, r.fixture_id, run.id, run.id, run.data_mode === "SIMULATED_DEMO" ? "SIMULATED_DEMO" : "PUBLISHED",
           r.featured_market_id, JSON.stringify(r.summary), JSON.stringify(r.analysis),
           JSON.stringify({ model_run_id: run.id, dataset_hash: run.dataset_hash, data_as_of_at: run.data_as_of_at, market_catalog_version: catalog.version }), run.generated_at]), ""), 10);
       return result;
@@ -270,7 +282,7 @@ export async function importSection(db: D1Database, req: ImportRequest, ctx: Imp
       if (!run) throw new Error(`unknown model run ${req.model_run_id}`);
       result.written = await runBatches(db, insertMany(db, "INSERT OR IGNORE", "model_evaluations",
         ["id", "model_run_id", "model_version", "market_family", "competition_id", "period", "sample_n", "brier", "log_loss", "baseline_brier", "baseline_log_loss", "calibration_json", "data_mode", "evaluated_at"],
-        req.rows.map((e) => [`ev_${req.backtest_run_id.slice(-20)}_${e.market_family}_${e.competition_id ?? "ALL"}`, req.backtest_run_id, run.model_version, e.market_family, e.competition_id,
+        req.rows.map((e) => [`ev_${req.backtest_run_id.replace(/[^a-zA-Z0-9]/g, "")}_${e.market_family}_${e.competition_id ?? "ALL"}`, req.backtest_run_id, run.model_version, e.market_family, e.competition_id,
           "rolling-origin backtest (recent completed rounds)", e.sample_n, e.brier, e.log_loss, e.baseline_brier, e.baseline_log_loss, JSON.stringify(e.calibration), run.data_mode, run.generated_at])), 10);
       return result;
     }
@@ -283,7 +295,7 @@ export async function importSection(db: D1Database, req: ImportRequest, ctx: Imp
       req.rows.forEach((o, index) => {
         const kickoff = ko.get(o.fixture_id);
         if (!kickoff || !marketById.has(o.market_id)) return result.rejected.push({ index, reason: "unknown fixture or market" });
-        data.push([`bk_${o.fixture_id}_${o.market_id}_${run.id.slice(-16)}`, o.fixture_id, o.market_id, o.bookmaker_name, o.odds_decimal, run.generated_at, kickoff, o.provider_source, o.provider_source.startsWith("synthetic") ? 1 : 0]);
+        data.push([`bk_${o.fixture_id}_${o.market_id}_${run.id.replace(/[^a-zA-Z0-9]/g, "")}`, o.fixture_id, o.market_id, o.bookmaker_name, o.odds_decimal, run.generated_at, kickoff, o.provider_source, o.provider_source.startsWith("synthetic") ? 1 : 0]);
       });
       result.written = await runBatches(db, insertMany(db, "INSERT OR IGNORE", "bookmaker_snapshots",
         ["id", "fixture_id", "market_definition_id", "bookmaker_name", "odds_decimal", "collected_at", "stale_after", "provider_source", "is_synthetic"], data));

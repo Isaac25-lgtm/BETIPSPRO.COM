@@ -148,9 +148,15 @@ export async function createInvite(env: Env, adminId: string, email: string): Pr
   const code = inviteCode();
   const id = newId("inv");
   const expires = new Date(Date.now() + INVITE_TTL_DAYS * 86_400_000).toISOString();
+  const now = nowIso();
+  const ins = await env.DB.prepare(
+    `INSERT INTO beta_invites (id, email, code_hash, status, issued_by, issued_at, expires_at, max_uses)
+       SELECT ?1, ?2, ?3, 'issued', ?4, ?5, ?6, 1
+        WHERE (SELECT COUNT(*) FROM users WHERE role = 'tester' AND status != 'deleted')
+            + (SELECT COUNT(*) FROM beta_invites WHERE status = 'issued' AND expires_at > ?5) < ?7`,
+  ).bind(id, email.toLowerCase(), await hashSecret(env, `invite:${code}`), adminId, now, expires, max).run();
+  if ((ins.meta.changes ?? 0) !== 1) throw new ApiError(409, "CONFLICT", `Beta is limited to ${max} testers.`);
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO beta_invites (id, email, code_hash, status, issued_by, issued_at, expires_at, max_uses) VALUES (?, ?, ?, 'issued', ?, ?, ?, 1)")
-      .bind(id, email.toLowerCase(), await hashSecret(env, `invite:${code}`), adminId, nowIso(), expires),
     env.DB.prepare("INSERT INTO admin_audit_log (id, actor_id, action, entity, entity_id, after_json, created_at) VALUES (?, ?, 'invite.create', 'beta_invite', ?, ?, ?)")
       .bind(newId("aud"), adminId, id, JSON.stringify({ email: email.toLowerCase(), expires_at: expires }), nowIso()),
   ]);

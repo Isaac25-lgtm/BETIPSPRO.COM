@@ -87,13 +87,13 @@ function Hero() {
           </div>
         </div>
         <ul className="feature-strip" aria-label="What you get">
-          <li><span className="fs-icon"><BarChart3 size={20} strokeWidth={2} /></span><span><strong>Model probabilities</strong><small>50+ markets per match</small></span></li>
+          <li><span className="fs-icon"><BarChart3 size={20} strokeWidth={2} /></span><span><strong>Model probabilities</strong><small>Up to 46 markets per match</small></span></li>
           <li><span className="fs-icon"><ShieldCheck size={20} strokeWidth={2} /></span><span><strong>Real match evidence</strong><small>Every number is traceable</small></span></li>
           <li><span className="fs-icon"><Trophy size={20} strokeWidth={2} /></span><span><strong>League hubs</strong><small>Tables, form and fixtures</small></span></li>
           <li><span className="fs-icon"><FileText size={20} strokeWidth={2} /></span><span><strong>Full match reports</strong><small>{config?.open_access ? "Open to everyone while we test" : "One credit unlocks it all"}</small></span></li>
         </ul>
         <dl className="hero-stats" aria-label="At a glance">
-          <div><dt>Markets per match</dt><dd className="num">56</dd></div>
+          <div><dt>Markets per match</dt><dd className="num">46</dd></div>
           <div><dt>Matches today</dt><dd className="num">{today ?? "–"}</dd></div>
           {config?.open_access ? <div><dt>Reports open</dt><dd>All</dd></div> : <div><dt>Free beta reports</dt><dd className="num">{config?.beta_initial_credits ?? 10}</dd></div>}
         </dl>
@@ -353,7 +353,7 @@ function ReportShowcase() {
           <span className="eyebrow eyebrow-dark">Full match report</span>
           <h2 id="showcase-title">Every market. Every number backed by real matches.</h2>
           <ul className="showcase-points">
-            <li><Check size={18} strokeWidth={3} /> 50+ markets per match: result, goals, BTTS, corners, cards</li>
+            <li><Check size={18} strokeWidth={3} /> Up to 46 markets per match: result, goals, BTTS, first half, correct score</li>
             <li><Check size={18} strokeWidth={3} /> The previous fixtures behind every probability</li>
             <li><Check size={18} strokeWidth={3} /> Honest uncertainty ranges, never “sure wins”</li>
           </ul>

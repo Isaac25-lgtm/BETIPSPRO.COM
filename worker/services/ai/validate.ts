@@ -33,7 +33,6 @@ export function allowedNumbers(evidence: unknown): Set<string> {
     else if (v && typeof v === "object") Object.values(v).forEach(walk);
   };
   walk(evidence);
-  for (let i = 0; i <= 10; i++) out.add(String(i)); // small cardinal words-as-digits are harmless
   return out;
 }
 

@@ -63,9 +63,9 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 /** GET with an in-memory stale-while-revalidate cache, deduplicated across components. */
 export function useApi<T>(path: string | null, opts: { ttlMs?: number } = {}) {
   const ttl = opts.ttlMs ?? 30_000;
-  const [state, setState] = useState<{ data: T | null; error: ApiError | null; loading: boolean }>(() => {
+  const [state, setState] = useState<{ key: string | null; data: T | null; error: ApiError | null; loading: boolean }>(() => {
     const hit = path ? cache.get(path) : undefined;
-    return { data: (hit?.data as T) ?? null, error: null, loading: !!path && !hit };
+    return { key: path, data: (hit?.data as T) ?? null, error: null, loading: !!path && !hit };
   });
   const [tick, setTick] = useState(0);
   const pathRef = useRef(path);
@@ -79,27 +79,27 @@ export function useApi<T>(path: string | null, opts: { ttlMs?: number } = {}) {
 
   useEffect(() => {
     if (!path) {
-      setState({ data: null, error: null, loading: false });
+      setState({ key: null, data: null, error: null, loading: false });
       return;
     }
     const hit = cache.get(path);
-    if (hit) setState({ data: hit.data as T, error: null, loading: false });
-    else setState((s) => ({ data: s.data && pathRef.current === path ? s.data : null, error: null, loading: true }));
+    if (hit) setState({ key: path, data: hit.data as T, error: null, loading: false });
+    else setState((s) => ({ key: path, data: s.key === path ? s.data : null, error: null, loading: true }));
     if (hit && Date.now() - hit.at < ttl) return;
     let p = inflight.get(path) as Promise<T> | undefined;
     if (!p) {
       p = api<T>(path);
       inflight.set(path, p);
-      p.finally(() => inflight.delete(path));
+      p.finally(() => inflight.delete(path)).catch(() => undefined);
     }
     let alive = true;
     p.then(
       (data) => {
         cache.set(path, { at: Date.now(), data });
-        if (alive && pathRef.current === path) setState({ data, error: null, loading: false });
+        if (alive && pathRef.current === path) setState({ key: path, data, error: null, loading: false });
       },
       (error: ApiError) => {
-        if (alive && pathRef.current === path) setState((s) => ({ data: hit ? s.data : null, error, loading: false }));
+        if (alive && pathRef.current === path) setState((s) => ({ key: path, data: hit && s.key === path ? s.data : null, error, loading: false }));
       },
     );
     return () => {
@@ -111,7 +111,9 @@ export function useApi<T>(path: string | null, opts: { ttlMs?: number } = {}) {
     if (pathRef.current) cache.delete(pathRef.current);
     setTick((t) => t + 1);
   }, []);
-  return { ...state, reload };
+  // Never hand back another resource's data while the new one loads.
+  const fresh = state.key === path;
+  return { data: fresh ? state.data : null, error: fresh ? state.error : null, loading: fresh ? state.loading : !!path, reload };
 }
 
 export function idempotencyKey(): string {

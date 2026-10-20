@@ -280,3 +280,49 @@ def test_display_matrix_folds_tail_and_keeps_totals():
     f = _fold(m, 7)
     assert f.shape == (7, 7) and abs(f.sum() - 1) < 1e-9
     assert abs(np.tril(f, -1).sum() - np.tril(m, -1).sum()) < 0.002  # home-win share survives folding
+
+
+# ---------------------------------------------------------------- review hardening (R-06, R-07, R-08, R-18)
+
+def test_invalid_curvature_is_refused_not_repaired():
+    from fip_model.models.goals import InvalidCurvature, _numeric_hessian
+    with pytest.raises(InvalidCurvature):
+        _numeric_hessian(lambda p: -float(p @ p), np.zeros(2), [0, 1])
+
+
+def test_missing_covariance_gives_no_draws_and_no_interval(comp_models, world):
+    import copy
+    from fip_model.engine import forecast_fixture
+    cdf, m = comp_models
+    m2 = copy.copy(m)
+    m2.goals = copy.copy(m.goals)
+    m2.goals.cov = None
+    assert m2.goals.sample_params(10, np.random.default_rng(1)) is None
+    fx = cdf[cdf["status"] == "NS"].iloc[0].to_dict()
+    _, rows = forecast_fixture(m2, fx, CATALOG, np.random.default_rng(1), demo=True, n_samples=40)
+    home = next(r for r in rows if r["market_id"] == "MATCH_RESULT_HOME_REGULATION")
+    assert home["probability"] is not None and "unavailable" in home["uncertainty"] and "p05" not in home["uncertainty"]
+
+
+def test_unconverged_fit_is_not_usable(comp_models):
+    import copy
+    _, m = comp_models
+    g = copy.copy(m.goals)
+    assert g.usable
+    g.converged = False
+    assert not g.usable
+
+
+def test_count_tails_are_folded_not_renormalised():
+    from fip_model.models.counts import convolve_pmfs, nb_pmf
+    k = np.arange(31)
+    tot = convolve_pmfs(nb_pmf(k, 10.0, 1.0), nb_pmf(k, 10.0, 1.0), 31)
+    assert abs(tot.sum() - 1) < 1e-9
+    # P(total <= 10) is unchanged by where the tail mass is kept
+    exact = np.convolve(nb_pmf(np.arange(400), 10.0, 1.0), nb_pmf(np.arange(400), 10.0, 1.0))[:11].sum()
+    assert abs(tot[:11].sum() - exact) < 1e-9
+
+
+def test_extreme_scoreline_rates_are_refused():
+    with pytest.raises(ValueError):
+        dc_matrix(40.0, 40.0, 0.0)

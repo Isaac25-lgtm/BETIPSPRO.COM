@@ -23,7 +23,11 @@ from scipy.stats import poisson
 
 MAX_GOALS = 10  # minimum scoreline grid 0..10 per side
 TAIL_TOL = 1e-10  # the grid grows until each side's Poisson tail beyond it is below this
-GRID_CAP = 25
+GRID_CAP = 60  # if the tolerance still is not met here, the distribution is refused (R-18)
+
+
+class InvalidCurvature(ValueError):
+    """The Hessian at the optimum is materially non-positive-definite: no valid Laplace covariance exists (R-07)."""
 
 
 @dataclass
@@ -42,6 +46,13 @@ class GoalsFit:
     team_index: dict[str, int] = field(default_factory=dict)
     ridge_s: float | None = None
     ridge_t: float | None = None
+    cov_reason: str | None = None
+    finite: bool = True
+
+    @property
+    def usable(self) -> bool:
+        """R-06: only a converged fit with finite parameters may publish."""
+        return self.converged and self.finite
 
     # parameter layout: [mu, home_adv, rho, attack(n), defence(n)]
     @property
@@ -63,9 +74,10 @@ class GoalsFit:
         rho = self.unpack(p)[2]
         return dc_matrix(lam, mu_, rho)
 
-    def sample_params(self, n: int, rng: np.random.Generator) -> np.ndarray:
+    def sample_params(self, n: int, rng: np.random.Generator) -> np.ndarray | None:
+        # R-07: without a valid covariance there are no parameter draws (never repeat the point estimate).
         if self.cov is None:
-            return np.repeat(self.params[None, :], n, axis=0)
+            return None
         return rng.multivariate_normal(self.params, self.cov, size=n, check_valid="ignore", method="eigh")
 
 
@@ -82,6 +94,8 @@ def grid_size(lam: float, mu: float, max_goals: int = MAX_GOALS) -> int:
     k = max_goals
     while k < GRID_CAP and max(poisson.sf(k, lam), poisson.sf(k, mu)) > TAIL_TOL:
         k += 1
+    if max(poisson.sf(k, lam), poisson.sf(k, mu)) > TAIL_TOL:
+        raise ValueError(f"scoreline tail above tolerance even at {GRID_CAP} goals (rates {lam:.2f}, {mu:.2f})")
     return k
 
 
@@ -150,6 +164,10 @@ def fit_goals(
             tau[m01] = 1 + lam[m01] * rho; d_lam[m01] = lam[m01] * rho; d_rho[m01] = lam[m01]
             tau[m10] = 1 + lmu[m10] * rho; d_lmu[m10] = lmu[m10] * rho; d_rho[m10] = lmu[m10]
             tau[m11] = 1 - rho; d_rho[m11] = -1.0
+        # R-08: where a factor is clipped the objective is flat in it, so its derivative must be zero too.
+        clipped = tau <= 1e-9
+        if clipped.any():
+            d_lam = np.where(clipped, 0.0, d_lam); d_lmu = np.where(clipped, 0.0, d_lmu); d_rho = np.where(clipped, 0.0, d_rho)
         tau = np.clip(tau, 1e-9, None)
         ll = x * log_lam - lam + y * log_lmu - lmu - const + np.log(tau)
         if split:
@@ -182,6 +200,7 @@ def fit_goals(
     res = minimize(nll_grad, p0, jac=True, method="L-BFGS-B", bounds=bounds, options={"maxiter": 3000})
 
     cov = None
+    cov_reason: str | None = None if with_uncertainty else "uncertainty not requested"
     if with_uncertainty:
         free = [i for i in range(len(p0)) if not (i == 2 and not fit_rho)]
         H = _numeric_hessian(nll, res.x, free)
@@ -190,8 +209,11 @@ def fit_goals(
             cov_free = (cov_free + cov_free.T) / 2
             cov = np.zeros((len(p0), len(p0)))
             cov[np.ix_(free, free)] = cov_free
-        except np.linalg.LinAlgError:
+        except (np.linalg.LinAlgError, InvalidCurvature) as e:
             cov = None
+            cov_reason = str(e) or "covariance unavailable"
+        if cov is not None and not np.all(np.isfinite(cov)):
+            cov, cov_reason = None, "covariance not finite"
 
     return GoalsFit(
         teams=teams,
@@ -208,6 +230,8 @@ def fit_goals(
         team_index=idx,
         ridge_s=ridge_s,
         ridge_t=ridge_t,
+        cov_reason=cov_reason,
+        finite=bool(np.all(np.isfinite(res.x))),
     )
 
 
@@ -229,7 +253,10 @@ def _numeric_hessian(f, x0: np.ndarray, free: list[int], eps: float = 1e-4) -> n
                 H[a, a] = (f(xp) - 2 * fx + f(xm)) / eps**2
             else:
                 H[a, b] = H[b, a] = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4 * eps**2)
-    # Regularise tiny negative eigenvalues from numerical noise
+    # R-07: floor only tiny eigenvalues (finite-difference noise); a materially negative one means no valid covariance.
     vals, vecs = np.linalg.eigh(H)
+    scale = max(float(np.max(np.abs(vals))), 1e-12)
+    if float(np.min(vals)) < -1e-4 * scale:
+        raise InvalidCurvature(f"Hessian not positive definite (min eigenvalue {float(np.min(vals)):.3g})")
     vals = np.clip(vals, 1e-6, None)
     return vecs @ np.diag(vals) @ vecs.T

@@ -58,7 +58,8 @@ export function normalizeFixtures(items: ApiFixtureItem[], fetchedAt: string): F
       starts_at_utc: new Date(it.fixture.date).toISOString().replace(".000Z", "Z"),
       status: STATUS_MAP[it.fixture.status.short] ?? "TBD",
       // Regulation-time score: API-Football `score.fulltime` excludes extra time; `goals` may include it.
-      home_goals: it.score?.fulltime?.home ?? it.goals.home, away_goals: it.score?.fulltime?.away ?? it.goals.away,
+      home_goals: it.score?.fulltime?.home ?? (["AET", "PEN"].includes(it.fixture.status.short) ? null : it.goals.home),
+      away_goals: it.score?.fulltime?.away ?? (["AET", "PEN"].includes(it.fixture.status.short) ? null : it.goals.away),
       home_goals_ht: it.score?.halftime?.home ?? null, away_goals_ht: it.score?.halftime?.away ?? null,
       venue_name: it.fixture.venue?.name ?? null, venue_city: it.fixture.venue?.city ?? null,
       referee_id: referee ? refId(referee) : null, referee_name: referee,

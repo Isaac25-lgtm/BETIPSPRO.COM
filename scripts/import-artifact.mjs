@@ -31,3 +31,11 @@ for (const req of artifactRequests(artifact, 300)) {
   if (b.data.rejected.length) console.warn(`${req.section}: ${b.data.rejected.length} rejected, e.g.`, b.data.rejected.slice(0, 2));
 }
 console.log(`Imported ${artifact.data_mode} run ${artifact.model_run.id}: ${written} rows written, ${rejected} rejected.`);
+// R-14: record outcomes for any finished matches' pre-kickoff forecasts.
+const st = await fetch(`${url}/api/v1/admin/settle`, { method: "POST", headers: { ...H, cookie } });
+if (st.ok) console.log("Settlement:", JSON.stringify((await st.json()).data));
+// R-12: a partially rejected import is a failed import; do not treat it as published.
+if (rejected > 0) {
+  console.error(`FAILED: ${rejected} rows were rejected. Fix the artifact and re-run; nothing should be announced as published.`);
+  process.exit(1);
+}

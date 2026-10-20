@@ -41,12 +41,14 @@ function ramp(stops: readonly string[], t: number) {
   return `#${mix(1)}${mix(3)}${mix(5)}`;
 }
 
-export function ScorelineHeatmap({ matrix, home, away, title }: { matrix: number[][]; home: string; away: string; title: string }) {
+export function ScorelineHeatmap({ matrix, home, away, title, totals }: { matrix: number[][]; home: string; away: string; title: string; totals?: { home: number; draw: number; away: number } }) {
   const { bind, node } = useTip();
   const max = Math.max(...matrix.flat());
   const n = matrix.length;
+  // Exact model totals when given; summing the display grid would count the folded 6+/6+ cell as a draw.
   let ph = 0, pd = 0, pa = 0;
   matrix.forEach((row, h) => row.forEach((v, a) => { if (h > a) ph += v; else if (h === a) pd += v; else pa += v; }));
+  if (totals) ({ home: ph, draw: pd, away: pa } = totals);
   return (
     <figure className="chart heatmap">
       <figcaption className="chart-title">{title}</figcaption>
@@ -232,21 +234,21 @@ export function BaseRateComparison({ rows, title }: { rows: Array<{ label: strin
 }
 
 /** Total goals in the match (0..6+) from the scoreline matrix, split at the 2.5 line. */
-export function TotalGoalsChart({ matrix, title }: { matrix: number[][]; title: string }) {
+export function TotalGoalsChart({ matrix, title, expectedGoals, under25 }: { matrix: number[][]; title: string; expectedGoals?: number | null; under25?: number | null }) {
   const { bind, node } = useTip();
-  const n = matrix.length;
   const totals = Array.from({ length: 7 }, () => 0);
   matrix.forEach((row, h) => row.forEach((v, a) => { totals[Math.min(h + a, 6)] += v; }));
   const max = Math.max(...totals);
-  const under = totals[0] + totals[1] + totals[2];
-  const exp = matrix.reduce((s, row, h) => s + row.reduce((t, v, a) => t + v * (h + a), 0), 0);
+  // F-09: use the model's own expected goals; the folded display grid would treat every 6+ score as exactly 6.
+  const under = under25 ?? totals[0] + totals[1] + totals[2];
+  const exp = expectedGoals ?? matrix.reduce((s, row, h) => s + row.reduce((t, v, a) => t + v * (h + a), 0), 0);
   return (
     <figure className="chart goals-dist">
       <figcaption className="chart-title">{title}</figcaption>
       <div className="gd-summary">
         <span><b className="num">{pc(under, 0)}</b> under 2.5</span>
         <span><b className="num">{pc(1 - under, 0)}</b> over 2.5</span>
-        <span><b className="num">{exp.toFixed(1)}</b> goals expected{n <= 7 ? " (6+ grouped)" : ""}</span>
+        <span><b className="num">{exp.toFixed(1)}</b> goals expected</span>
       </div>
       <div className="gd-bars" role="img" aria-label={`${title}: ${totals.map((v, i) => `${i === 6 ? "6+" : i} goals ${pc(v, 0)}`).join(", ")}`}>
         {totals.map((v, i) => (

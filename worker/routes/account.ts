@@ -11,7 +11,7 @@ import {
 } from "../services/auth.ts";
 import { ENTITLEMENT_SCOPE, getBalance, hasEntitlement, unlockReport } from "../services/credits.ts";
 import { openAccess } from "../services/access.ts";
-import { assistantEnabled, chat, rateLimit } from "../services/assistant.ts";
+import { assistantEnabled, chat, MAX_HISTORY_CHARS, rateLimit } from "../services/assistant.ts";
 import { fullReport, marketEvidence } from "../services/evidence.ts";
 import { cached } from "../services/cache.ts";
 import { cachedSummary } from "../services/ai/gemini.ts";
@@ -163,8 +163,10 @@ async function canView(c: Context<AppBindings>, fixtureId: string): Promise<"sam
 // Ask BetTipsPro AI: answers only from the site's forecasts via read-only tools; per-visitor and daily limits.
 accountRoutes.post("/assistant/chat", async (c) => {
   if (!(await assistantEnabled(c.env))) throw new ApiError(404, "NOT_FOUND", "The assistant is not available right now.");
-  const b = await body(c, z.object({ messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(2000) })).min(1).max(16) }));
-  if (b.messages[b.messages.length - 1].role !== "user") throw new ApiError(400, "BAD_REQUEST", "The last message must be a question.");
+  const b = await body(c, z.object({ messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(MAX_HISTORY_CHARS) })).min(1).max(16) }));
+  const last = b.messages[b.messages.length - 1];
+  if (last.role !== "user") throw new ApiError(400, "BAD_REQUEST", "The last message must be a question.");
+  if (last.content.length > 2000) throw new ApiError(400, "BAD_REQUEST", "Please keep questions under 2,000 characters.");
   await rateLimit(c.env, await ipHash(c));
   return ok(c, await chat(c.env, b.messages));
 });
@@ -174,6 +176,9 @@ accountRoutes.post("/fixtures/:id/unlock", async (c) => {
   if (!u.age_confirmed_at) throw new ApiError(403, "FORBIDDEN", "Please confirm you are 18+ in settings before unlocking reports.");
   const key = c.req.header("idempotency-key") ?? null;
   if (key && (key.length < 8 || key.length > 100)) throw new ApiError(400, "BAD_REQUEST", "Invalid Idempotency-Key.");
+  if (await openAccess(c.env)) {
+    return ok(c, { unlocked: true, charged: false, balance: await getBalance(c.env, u.id), unlock_id: "open_access", free_reason: "open_access" }, { status: 200 });
+  }
   const res = await unlockReport(c.env, u.id, c.req.param("id"), key);
   return ok(c, res, { status: res.charged ? 201 : 200 });
 });

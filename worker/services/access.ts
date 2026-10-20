@@ -1,5 +1,6 @@
 import type { Env } from "../env.ts";
 import { nowIso } from "../lib/time.ts";
+import { clearPublicCache } from "../middleware/public-cache.ts";
 
 /**
  * Open access (testing phase, owner decision D-026): when on, every full report and evidence page is readable by
@@ -26,6 +27,7 @@ export async function setOpenAccess(env: Env, open: boolean, by: string | null):
     "INSERT INTO app_config (key, value_json, updated_at, updated_by) VALUES ('access', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by",
   ).bind(JSON.stringify({ open }), nowIso(), by).run();
   cache = null;
+  clearPublicCache();
 }
 
 /** Test/support hook: forget the cached value (e.g. after a direct DB write). */

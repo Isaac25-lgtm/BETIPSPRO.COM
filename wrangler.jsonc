@@ -64,6 +64,11 @@
         "AI_MONTHLY_BUDGET_USD": "10",
         "ASSISTANT_ENABLED": "true",
         "ASSISTANT_DAILY_LIMIT": "1500",
+        // DeepSeek spend caps (worst-case reservation per call, priced at the higher published rate).
+        "ASSISTANT_DAILY_BUDGET_USD": "3",
+        "ASSISTANT_MONTHLY_BUDGET_USD": "30",
+        "ASSISTANT_PRICE_IN_PER_M": "0.30",
+        "ASSISTANT_PRICE_OUT_PER_M": "1.20",
         "PAYMENTS_ENABLED": "false",
         "BETA_INVITE_ONLY": "true",
         "MAX_BETA_USERS": "5",
@@ -72,8 +77,9 @@
         "PUBLIC_PERFORMANCE_ONLY_VERIFIED": "true",
         "TURNSTILE_ENABLED": "false"
       },
-      // Data is refreshed by the offline pipeline + authenticated import, so no cron in production.
-      "triggers": { "crons": [] }
+      // Data is refreshed by the offline pipeline + authenticated import. The daily cron only settles finished
+      // pre-kickoff forecasts (no provider calls unless pilot leagues are configured).
+      "triggers": { "crons": ["30 3 * * *"] }
     }
   }
 }

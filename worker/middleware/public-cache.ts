@@ -14,7 +14,7 @@ export function publicCache(ttlSec = 60): MiddlewareHandler<AppBindings> {
   return async (c, next) => {
     if (c.req.method !== "GET") return next();
     const url = new URL(c.req.url);
-    const key = `${url.pathname}?${[...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("&")}`;
+    const key = `${url.pathname}?${[...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&")}`;
     const now = Date.now();
     const hit = memo.get(key);
     if (hit && hit.exp > now) return new Response(hit.body, { headers: [...hit.headers, ["X-Cache", "memo"]] });

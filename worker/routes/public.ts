@@ -133,8 +133,8 @@ publicRoutes.get("/statistics/models", async (c) => {
     ).bind(latest?.id ?? ""),
     c.env.DB.prepare(
       `SELECT
-         SUM(CASE WHEN is_pre_kickoff = 1 AND status NOT IN ('SIMULATED_DEMO') AND settled_outcome IS NOT NULL THEN 1 ELSE 0 END) AS verified_live_settled,
-         SUM(CASE WHEN is_pre_kickoff = 1 AND status NOT IN ('SIMULATED_DEMO') THEN 1 ELSE 0 END) AS live_published,
+         SUM(CASE WHEN is_pre_kickoff = 1 AND status IN ('VERIFIED','PARTIAL') AND probability IS NOT NULL AND settled_outcome IS NOT NULL THEN 1 ELSE 0 END) AS verified_live_settled,
+         SUM(CASE WHEN is_pre_kickoff = 1 AND status IN ('VERIFIED','PARTIAL') AND probability IS NOT NULL THEN 1 ELSE 0 END) AS live_published,
          SUM(CASE WHEN is_pre_kickoff = 1 AND status = 'SIMULATED_DEMO' THEN 1 ELSE 0 END) AS demo_published,
          SUM(CASE WHEN is_pre_kickoff = 0 THEN 1 ELSE 0 END) AS backtest_rows
        FROM forecasts`,

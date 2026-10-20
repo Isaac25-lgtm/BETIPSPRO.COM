@@ -23,7 +23,10 @@ const BASE = arg("url", "http://127.0.0.1:5173");
 const PROJECT = arg("project", "paperaid");
 const LOCATION = arg("location", "us-central1");
 const MODEL = arg("model", "gemini-2.5-flash");
+// R-09: the owner authorised at most $10/month for summaries; a higher --cap is refused.
+const AUTHORISED_MAX = 10;
 const CAP = Number(arg("cap", "10"));
+if (!Number.isFinite(CAP) || CAP <= 0 || CAP > AUTHORISED_MAX) throw new Error(`--cap must be between 0 and ${AUTHORISED_MAX} (owner-authorised monthly ceiling).`);
 const MAX_FIXTURES = Number(arg("fixtures", "20"));
 const MARKETS = arg("markets", "MATCH_RESULT_HOME_REGULATION,TOTAL_GOALS_OVER_2_5_REGULATION,BTTS_YES_REGULATION").split(",");
 // Gemini 2.5 Flash paid-tier prices (USD per 1M tokens), ai.google.dev/gemini-api/docs/pricing (checked 2026-10-20).
@@ -106,6 +109,8 @@ outer: for (const f of fixtures) {
 ${evidenceJson}`).digest("hex");
     if (done.has(`${f.id}|${marketId}|${ev.report_version}|${hash}`)) { skipped++; continue; }
     const worst = ((evidenceJson.length / 3 + 400) / 1e6) * PRICE[0] + (MAX_OUT / 1e6) * PRICE[1];
+    // Re-read the durable month-to-date spend before every call, so concurrent or earlier runs are counted.
+    spend = Math.max(spend, Number((await get("/admin/ai/status")).month_spend_usd));
     if (spend + worst > CAP) { console.log(`Stopping: monthly cap $${CAP} would be exceeded.`); break outer; }
     if (has("dry-run")) { console.log(`[dry-run] would summarise ${compact.match} / ${compact.market}`); continue; }
 
@@ -145,19 +150,19 @@ ${evidenceJson}`).digest("hex");
     const v = ok ? validateSummary([parsed.summary, ...parsed.key_points].join(" \n"), allowedNumbers(compact)) : { ok: false, problems: ["schema"] };
     if (v.ok) accepted++; else rejected++;
     usedThisFixture = true;
-    rows.push({
+    const row = {
       fixture_id: f.id, market_id: marketId, report_version: ev.report_version, evidence_hash: hash, model: MODEL,
       text_json: JSON.stringify(v.ok ? { ...parsed, validation: v, model: MODEL, generated_at: new Date().toISOString() } : { rejected: true, validation: v }),
       input_tokens: inT, output_tokens: outT, cost_usd: Number(cost.toFixed(6)),
-    });
+    };
+    rows.push(row);
+    // Persist each billed attempt immediately (durable spend record even if the run crashes later).
+    const imp = await fetch(`${BASE}/api/v1/admin/ai/import`, { method: "POST", headers: { ...H, cookie }, body: JSON.stringify({ rows: [row] }) });
+    if (!imp.ok) { console.log(`Import failed (${imp.status}); stopping so no billed attempt goes unrecorded.`); break outer; }
     console.log(`${v.ok ? "OK      " : "REJECTED"} ${compact.match} / ${compact.market}${v.ok ? "" : `  (${v.problems.join("; ").slice(0, 120)})`}`);
   }
   if (usedThisFixture) fixturesDone++;
 }
 
-if (rows.length) {
-  const r = await fetch(`${BASE}/api/v1/admin/ai/import`, { method: "POST", headers: { ...H, cookie }, body: JSON.stringify({ rows }) });
-  const j = await r.json();
-  console.log(`Imported: ${j.data?.written ?? 0}/${rows.length}`);
-}
+console.log(`Recorded ${rows.length} attempt(s) as they were made.`);
 console.log(`\nVertex calls: ${calls} | accepted ${accepted} | rejected ${rejected} | skipped ${skipped} | tokens in/out ${tokIn}/${tokOut} | this run $${(rows.reduce((s, r) => s + r.cost_usd, 0)).toFixed(4)} | month-to-date $${spend.toFixed(4)} of $${CAP}`);

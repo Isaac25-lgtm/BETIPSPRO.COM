@@ -35,6 +35,10 @@ export interface Env {
   DEEPSEEK_API_KEY?: string;
   ASSISTANT_ENABLED?: string;
   ASSISTANT_DAILY_LIMIT?: string;
+  ASSISTANT_DAILY_BUDGET_USD?: string;
+  ASSISTANT_MONTHLY_BUDGET_USD?: string;
+  ASSISTANT_PRICE_IN_PER_M?: string;
+  ASSISTANT_PRICE_OUT_PER_M?: string;
 }
 
 export interface SessionUser {

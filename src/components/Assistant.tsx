@@ -16,8 +16,20 @@ const SAMPLES = [
   "Which matches look tight, with no team above 45%?",
   "Matches with a goal before half-time above 85%",
   "Which Serie A matches lean towards under 2.5 goals?",
-  "How accurate has the model been?",
+  "Which away teams are favourites this week?",
 ];
+
+const MATCH_PATH = /^\/matches\/[A-Za-z0-9:%._-]+$/;
+const isMsg = (m: unknown): m is Msg =>
+  !!m && typeof m === "object" && ((m as Msg).role === "user" || (m as Msg).role === "assistant") && typeof (m as Msg).content === "string" && (m as Msg).content.length <= 4000;
+function loadHistory(): Msg[] {
+  try {
+    const raw: unknown = JSON.parse(sessionStorage.getItem("asst-msgs") ?? "[]");
+    return Array.isArray(raw) ? raw.filter(isMsg).slice(-20) : [];
+  } catch {
+    return [];
+  }
+}
 
 /** Tiny safe renderer: paragraphs, numbered / bullet lists, **bold**, and internal links [text](/path). */
 function renderInline(text: string, key: string): ReactNode[] {
@@ -27,7 +39,8 @@ function renderInline(text: string, key: string): ReactNode[] {
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
     if (m[1]) { const k = `${key}-b${i++}`; out.push(<strong key={k}>{renderInline(m[1], k)}</strong>); }
-    else out.push(<Link key={`${key}-l${i++}`} to={m[3]} className="asst-link">{m[2] === "link" ? "Open match" : m[2]}</Link>);
+    else if (MATCH_PATH.test(m[3]) && !m[3].includes("\\")) out.push(<Link key={`${key}-l${i++}`} to={m[3]} className="asst-link">{m[2] === "link" ? "Open match" : m[2]}</Link>);
+    else out.push(m[2]); // F-05: only internal match pages are ever linked
     last = re.lastIndex;
   }
   if (last < text.length) out.push(text.slice(last));
@@ -63,9 +76,8 @@ function Markdown({ text }: { text: string }) {
 export function Assistant() {
   const { config } = useAuth();
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState<Msg[]>(() => {
-    try { return JSON.parse(sessionStorage.getItem("asst-msgs") ?? "[]"); } catch { return []; }
-  });
+  const [msgs, setMsgs] = useState<Msg[]>(loadHistory);
+  const generation = useRef(0); // F-07: answers from a conversation that was reset are ignored
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -92,18 +104,19 @@ export function Assistant() {
   const ask = async (q: string) => {
     const question = q.trim();
     if (!question || busy) return;
-    const next = [...msgs, { role: "user" as const, content: question }];
+    const gen = generation.current;
+    const next = [...msgs, { role: "user" as const, content: question.slice(0, 2000) }];
     setMsgs(next);
     setDraft("");
     setErr(null);
     setBusy(true);
     try {
-      const r = await api<{ answer: string }>("/assistant/chat", { method: "POST", json: { messages: next.slice(-10) } });
-      setMsgs([...next, { role: "assistant", content: r.answer }]);
+      const r = await api<{ answer: string }>("/assistant/chat", { method: "POST", json: { messages: next.slice(-10).map((m) => ({ ...m, content: m.content.slice(0, 4000) })) } });
+      if (gen === generation.current) setMsgs([...next, { role: "assistant", content: r.answer.slice(0, 4000) }]);
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : "Something went wrong. Please try again.");
+      if (gen === generation.current) setErr(e instanceof ApiError ? e.message : "Something went wrong. Please try again.");
     } finally {
-      setBusy(false);
+      if (gen === generation.current) setBusy(false);
     }
   };
 
@@ -128,7 +141,7 @@ export function Assistant() {
           <header className="asst-head">
             <span className="asst-avatar" aria-hidden="true"><Sparkles size={16} /></span>
             <div className="asst-title"><strong>Ask BetTipsPro AI</strong><span>Answers from today's model data</span></div>
-            {msgs.length > 0 && <button className="asst-icon" onClick={() => { setMsgs([]); setErr(null); }} aria-label="New chat" title="New chat"><RotateCcw size={16} /></button>}
+            {msgs.length > 0 && <button className="asst-icon" onClick={() => { generation.current++; setMsgs([]); setErr(null); setBusy(false); }} aria-label="New chat" title="New chat"><RotateCcw size={16} /></button>}
             <button className="asst-icon" onClick={() => setOpen(false)} aria-label="Close"><X size={18} /></button>
           </header>
           <div className="asst-body" onClick={onBodyClick}>

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import CRESTS from "../lib/crest-manifest.json";
 
 // Real crests are testing-phase reference assets (D-029); a missing file falls back to the monogram next render.
@@ -40,13 +40,22 @@ export function Logo({ compact = false, dark = true }: { compact?: boolean; dark
 /** Real club crest when we hold one (public/crests, see scripts/fetch-crests.py), else a monogram from team colours. */
 export function TeamBadge({ team, size = 32 }: { team: Pick<TeamRef, "name" | "primary_color" | "secondary_color" | "code"> & { id?: string }; size?: number }) {
   const crest = REFERENCE_ASSETS && team.id ? (CRESTS.teams as Record<string, string>)[team.id] : undefined;
-  if (crest && !failedCrests.has(crest)) {
-    return (
-      <span className="team-badge crest" style={{ width: size, height: size }} aria-hidden="true">
-        <img src={crest} alt="" width={size} height={size} loading="lazy" decoding="async" onError={(e) => { failedCrests.add(crest); (e.currentTarget.parentElement as HTMLElement).style.visibility = "hidden"; }} />
-      </span>
-    );
-  }
+  if (crest) return <CrestOrMonogram crest={crest} team={team} size={size} />;
+  return <Monogram team={team} size={size} />;
+}
+
+/** F-10: a crest that fails to load is replaced by the monogram immediately (state-driven, no manual DOM edits). */
+function CrestOrMonogram({ crest, team, size }: { crest: string; team: Pick<TeamRef, "name" | "primary_color" | "secondary_color" | "code">; size: number }) {
+  const [failed, setFailed] = useState(failedCrests.has(crest));
+  if (failed) return <Monogram team={team} size={size} />;
+  return (
+    <span className="team-badge crest" style={{ width: size, height: size }} aria-hidden="true">
+      <img src={crest} alt="" width={size} height={size} loading="lazy" decoding="async" onError={() => { failedCrests.add(crest); setFailed(true); }} />
+    </span>
+  );
+}
+
+function Monogram({ team, size }: { team: Pick<TeamRef, "name" | "primary_color" | "secondary_color" | "code">; size: number }) {
   const c1 = team.primary_color ?? "#334155";
   const c2 = team.secondary_color ?? "#ffffff";
   const light = isLight(c1);
@@ -88,10 +97,11 @@ function isLight(hex: string) {
 /** Competition emblem when we hold one, else a quiet initials tile. */
 export function CompMark({ name, id }: { name: string; id?: string; synthetic?: boolean }) {
   const emblem = REFERENCE_ASSETS && id ? (CRESTS.comps as Record<string, string>)[id] : undefined;
-  if (emblem) {
+  const [failed, setFailed] = useState(false);
+  if (emblem && !failed) {
     return (
       <span className="comp-mark comp-emblem" aria-hidden="true">
-        <img src={emblem} alt="" width={20} height={20} loading="lazy" decoding="async" />
+        <img src={emblem} alt="" width={20} height={20} loading="lazy" decoding="async" onError={() => setFailed(true)} />
       </span>
     );
   }

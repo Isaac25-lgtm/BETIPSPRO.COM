@@ -15,6 +15,8 @@ import { budgetConfig, usageSummary } from "../services/sports/budget.ts";
 import { exportHistory, runIngestion } from "../services/sports/ingestion.ts";
 import { aiStatus, generateSummary } from "../services/ai/gemini.ts";
 import { marketEvidence } from "../services/evidence.ts";
+import { allowedNumbers, validateSummary } from "../services/ai/validate.ts";
+import { settlePreKickoff } from "../services/settlement.ts";
 
 export const adminRoutes = new Hono<AppBindings>();
 adminRoutes.use("*", adminOnly);
@@ -305,15 +307,43 @@ adminRoutes.post("/ai/import", async (c) => {
     })).max(200),
   }));
   let written = 0;
+  let rejected = 0;
+  const Summary = z.object({ summary: z.string().min(20).max(900), key_points: z.array(z.string().min(3).max(200)).max(5) }).passthrough();
   for (const r of b.rows) {
+    let text = r.text_json;
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(r.text_json); } catch { /* invalid JSON is stored as rejected below */ }
+    if (!(parsed && typeof parsed === "object" && (parsed as { rejected?: boolean }).rejected)) {
+      const shape = Summary.safeParse(parsed);
+      const rep = await c.env.DB.prepare("SELECT 1 FROM match_reports WHERE fixture_id = ? AND report_version = ?").bind(r.fixture_id, r.report_version).first();
+      let problems: string[] = [];
+      if (!shape.success) problems = ["summary shape invalid"];
+      else if (!rep) problems = ["no report with this fixture and report version"];
+      else {
+        const ev = await marketEvidence(c.env, r.fixture_id, r.market_id).catch(() => null);
+        if (!ev) problems = ["evidence unavailable for this market"];
+        else problems = validateSummary([shape.data.summary, ...shape.data.key_points].join(" \n"), allowedNumbers(ev)).problems;
+      }
+      if (problems.length) {
+        rejected++;
+        text = JSON.stringify({ rejected: true, validation: { ok: false, problems, checked_at: nowIso(), by: "server-import" } });
+      }
+    }
     const res = await c.env.DB.prepare(
       "INSERT OR IGNORE INTO ai_explanations (id, fixture_id, market_definition_id, report_version, evidence_hash, model, text_json, input_tokens, output_tokens, cost_usd, created_at) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM fixtures WHERE id = ?)",
-    ).bind(newId("ai"), r.fixture_id, r.market_id, r.report_version, r.evidence_hash, r.model, r.text_json, r.input_tokens, r.output_tokens, r.cost_usd, nowIso(), r.fixture_id).run();
+    ).bind(newId("ai"), r.fixture_id, r.market_id, r.report_version, r.evidence_hash, r.model, text, r.input_tokens, r.output_tokens, r.cost_usd, nowIso(), r.fixture_id).run();
     written += res.meta.changes ?? 0;
   }
   bumpCacheGeneration();
   await audit(c, "ai.import", "ai_explanations", null, { rows: b.rows.length, written, cost_usd: b.rows.reduce((s, r) => s + r.cost_usd, 0) });
-  return ok(c, { received: b.rows.length, written });
+  return ok(c, { received: b.rows.length, written, rejected_by_server: rejected });
+});
+
+/** R-14: record outcomes for finished matches' pre-kickoff forecasts (append-only fields). */
+adminRoutes.post("/settle", async (c) => {
+  const r = await settlePreKickoff(c.env);
+  await audit(c, "forecasts.settle", "forecasts", null, r);
+  return ok(c, r);
 });
 
 adminRoutes.post("/ai/generate", async (c) => {

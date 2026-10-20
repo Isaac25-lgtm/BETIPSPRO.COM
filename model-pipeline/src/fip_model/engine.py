@@ -29,7 +29,7 @@ from . import (
     PIPELINE_VERSION,
 )
 from .markets import Distributions, probability, settle
-from .models.counts import NBFit, convolve_pmfs, fit_nb, nb_pmf
+from .models.counts import NBFit, convolve_pmfs, fit_nb, fold_tail, nb_pmf
 from .models.goals import GoalsFit, dc_matrix, fit_goals
 
 MIN_TEAM_MATCHES = 6
@@ -144,7 +144,8 @@ class CompModels:
 
 
 def _completed(df: pd.DataFrame) -> pd.DataFrame:
-    return df[df["status"].isin(["FT", "AET", "PEN"]) & df["home_goals"].notna()]
+    # R-06: both regulation scores must be present.
+    return df[df["status"].isin(["FT", "AET", "PEN"]) & df["home_goals"].notna() & df["away_goals"].notna()]
 
 
 def fit_competition(df: pd.DataFrame, cutoff: pd.Timestamp, catalog: dict, with_uncertainty: bool = True) -> CompModels:
@@ -164,13 +165,18 @@ def fit_competition(df: pd.DataFrame, cutoff: pd.Timestamp, catalog: dict, with_
             train["home_goals"].to_numpy(), train["away_goals"].to_numpy(), days,
             with_uncertainty=with_uncertainty, ridge_s=GOALS_RIDGE_QUALITY, ridge_t=GOALS_RIDGE_PROPENSITY,
         )
-        ht_rows = train["home_goals_ht"].notna()
+        if not goals.usable:
+            goals_reason = "The goals model fit did not converge to a valid optimum; no forecast is published."
+            goals = None
+        ht_rows = train["home_goals_ht"].notna() & train["away_goals_ht"].notna()
         if ht_rows.sum() >= MIN_LEAGUE_MATCHES:
             ht = fit_goals(
                 list(train.loc[ht_rows, "home_team_id"]), list(train.loc[ht_rows, "away_team_id"]),
                 train.loc[ht_rows, "home_goals_ht"].to_numpy(), train.loc[ht_rows, "away_goals_ht"].to_numpy(),
                 days[ht_rows.to_numpy()], ridge=6.0, fit_rho=False, with_uncertainty=with_uncertainty,
             )
+            if not ht.usable:
+                ht = None
 
     # Corners: one observation per team per match
     corners = None
@@ -288,8 +294,7 @@ def distributions(m: CompModels, home: str, away: str, ref: str | None, gp=None,
         beta, alpha = (m.cards.beta, m.cards.alpha) if kp is None else (kp[:-1], float(np.exp(kp[-1])))
         x = _card_row(m, home, away, ref)
         kk = np.arange(CARD_PMF_SIZE)
-        pmf = nb_pmf(kk, float(np.exp(x @ beta)), alpha)
-        cards_total = pmf / pmf.sum()
+        cards_total = fold_tail(nb_pmf(kk, float(np.exp(x @ beta)), alpha))
     return Distributions(ft, ht, corners_total, cards_total)
 
 
@@ -303,13 +308,16 @@ def _market_quality(mdef: dict, m: CompModels, home: str, away: str, demo: bool)
             return "INSUFFICIENT", f"Fewer than {MIN_TEAM_MATCHES} completed matches for {len(low)} team(s) before cut-off."
     elif fam == "first_half_poisson":
         if m.ht is None:
-            return "INSUFFICIENT", "Half-time scores unavailable or below minimum sample."
+            return "INSUFFICIENT", "Half-time scores unavailable, below minimum sample, or the fit did not converge."
+        low = [t for t in (home, away) if m.team_counts.get(t, 0) < MIN_TEAM_MATCHES]
+        if low:  # R-17: same per-team minimum as full time
+            return "INSUFFICIENT", f"Fewer than {MIN_TEAM_MATCHES} completed matches for {len(low)} team(s) before cut-off."
     elif fam == "corners_negative_binomial":
-        if m.corners is None:
-            return "INSUFFICIENT", m.corners_reason
+        if m.corners is None or not m.corners.converged:
+            return "INSUFFICIENT", m.corners_reason or "The corners model fit did not converge."
     elif fam == "cards_negative_binomial":
-        if m.cards is None:
-            return "INSUFFICIENT", m.cards_reason
+        if m.cards is None or not m.cards.converged:
+            return "INSUFFICIENT", m.cards_reason or "The cards model fit did not converge."
     if demo:
         return "SIMULATED_DEMO", "Synthetic demo data: not a real forecast."
     if fam in ("corners_negative_binomial", "cards_negative_binomial", "first_half_poisson"):
@@ -320,19 +328,33 @@ def _market_quality(mdef: dict, m: CompModels, home: str, away: str, demo: bool)
 def forecast_fixture(m: CompModels, fx: dict, catalog: dict, rng: np.random.Generator, demo: bool, n_samples: int = UNCERTAINTY_SAMPLES):
     home, away, ref = fx["home_team_id"], fx["away_team_id"], fx.get("referee_id")
     point = distributions(m, home, away, ref)
-    # Laplace-approximation samples for uncertainty intervals
-    gs = m.goals.sample_params(n_samples, rng) if m.goals else [None] * n_samples
-    hs = m.ht.sample_params(n_samples, rng) if m.ht else [None] * n_samples
-    cs = m.corners.sample(n_samples, rng) if m.corners else [None] * n_samples
-    ks = m.cards.sample(n_samples, rng) if m.cards else [None] * n_samples
-    sampled = [distributions(m, home, away, ref, gs[i], hs[i], cs[i], ks[i]) for i in range(n_samples)]
+    # Laplace-approximation samples for uncertainty intervals. R-07: a family without a valid covariance gets no
+    # interval at all (never identical repeated draws presented as a zero-width range).
+    def draws(fit, fn):
+        return fn(n_samples, rng) if fit is not None else None
+    gs = draws(m.goals, m.goals.sample_params if m.goals else None)
+    hs = draws(m.ht, m.ht.sample_params if m.ht else None)
+    cs = draws(m.corners, m.corners.sample if m.corners else None)
+    ks = draws(m.cards, m.cards.sample if m.cards else None)
+    has_draws = {"goals_dixon_coles": gs is not None, "first_half_poisson": hs is not None, "corners_negative_binomial": cs is not None, "cards_negative_binomial": ks is not None}
+    pick = lambda arr, i: None if arr is None else arr[i]
+    sampled = []
+    for i in range(n_samples):
+        try:
+            sampled.append(distributions(m, home, away, ref, pick(gs, i), pick(hs, i), pick(cs, i), pick(ks, i)))
+        except ValueError:
+            continue  # an extreme parameter draw whose distribution is refused is skipped, not silently repaired
 
     rows = []
     for mdef in catalog["markets"]:
         status, reason = _market_quality(mdef, m, home, away, demo)
         p = probability(mdef["predicate"], point) if status != "INSUFFICIENT" else None
         unc = {}
-        if p is not None:
+        if p is not None and not has_draws.get(mdef["model_family"], False):
+            unc = {"unavailable": "Parameter covariance unavailable for this model fit; no uncertainty range is published."}
+        elif p is not None and len(sampled) < max(20, n_samples // 2):
+            unc = {"unavailable": "Too many invalid parameter draws; no uncertainty range is published."}
+        elif p is not None:
             draws = np.array([probability(mdef["predicate"], s) for s in sampled], dtype=float)
             unc = {
                 "p05": round(float(np.nanpercentile(draws, 5)), 4),
@@ -489,9 +511,18 @@ def run(dataset: Dataset, catalog: dict, data_mode: str, now: datetime, seed: in
             for fx in upcoming.to_dict("records"):
                 point, rows = forecast_fixture(models, fx, catalog, rng, demo)
                 forecasts.extend(rows)
-                driver_rows.extend(drivers(models, fx))
+                drv = drivers(models, fx)
+                if probs_ok := {r["market_id"]: r["probability"] for r in rows}:
+                    if probs_ok.get("MATCH_RESULT_HOME_REGULATION") is None:
+                        drv = [d for d in drv if d["model_family"] != "goals_dixon_coles"]
+                    if not any(probs_ok.get(k) is not None for k in probs_ok if k.startswith("FIRST_HALF")):
+                        drv = [d for d in drv if d["model_family"] != "first_half_poisson"]
+                driver_rows.extend(drv)
                 probs = {r["market_id"]: r["probability"] for r in rows}
                 featured = _featured(probs, models.baselines)
+                # R-05: a component whose probabilities are withheld for this fixture also withholds its matrices.
+                ft_ok = probs.get("MATCH_RESULT_HOME_REGULATION") is not None
+                ht_ok = any(probs.get(k) is not None for k in probs if k.startswith("FIRST_HALF"))
                 reports.append({
                     "fixture_id": fx["id"],
                     "featured_market_id": featured["market_id"] if featured else None,
@@ -499,8 +530,8 @@ def run(dataset: Dataset, catalog: dict, data_mode: str, now: datetime, seed: in
                                 "competition_training_matches": models.n_train,
                                 "data_as_of_at": iso(models.as_of) if models.as_of is not None else None},
                     "analysis": {
-                        "scoreline_matrix": None if point.ft is None else np.round(_fold(point.ft, 7), 5).tolist(),
-                        "ht_matrix": None if point.ht is None else np.round(_fold(point.ht, 5), 5).tolist(),
+                        "scoreline_matrix": None if point.ft is None or not ft_ok else np.round(_fold(point.ft, 7), 5).tolist(),
+                        "ht_matrix": None if point.ht is None or not ht_ok else np.round(_fold(point.ht, 5), 5).tolist(),
                         "corners_total_pmf": None if point.corners_total is None else np.round(point.corners_total[:21], 5).tolist(),
                         "cards_total_pmf": None if point.cards_total is None else np.round(point.cards_total[:12], 5).tolist(),
                     },
@@ -508,8 +539,8 @@ def run(dataset: Dataset, catalog: dict, data_mode: str, now: datetime, seed: in
                 if synthetic_odds:
                     odds.extend(_synthetic_odds(fx["id"], probs, by_id, rng))
 
-        # ---- rolling-origin backtest on the most recent completed rounds
-        done = _completed(cdf)
+        # ---- rolling-origin backtest on the most recent completed rounds (R-04: only matches before the run's as-of time)
+        done = _completed(cdf[cdf["ko"] < now_ts])
         cur_season = comp.get("current_season")
         sdone = done[done["season"] == cur_season] if cur_season else done
         season_rounds = sorted(sdone["round"].dropna().unique(), key=lambda r: sdone[sdone["round"] == r]["ko"].min())

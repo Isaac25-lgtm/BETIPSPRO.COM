@@ -187,19 +187,22 @@ export async function fullReport(env: Env, fixtureId: string) {
   const row = await getFixtureRow(env, fixtureId);
   if (!row.report_version) throw new ApiError(409, "REPORT_UNAVAILABLE", "No report has been prepared for this fixture.");
   const runId = row.report_version;
-  const [rep, drv, odds, run, h2h] = await env.DB.batch<Record<string, unknown>>([
+  const [rep, drv, odds, run] = await env.DB.batch<Record<string, unknown>>([
     env.DB.prepare("SELECT summary_json, analysis_json, evidence_manifest_json, generated_at, report_status FROM match_reports WHERE fixture_id = ? AND report_version = ?").bind(fixtureId, runId),
     env.DB.prepare("SELECT model_family, metric, value, sample_window FROM forecast_evidence WHERE fixture_id = ? AND model_run_id = ? ORDER BY model_family, metric").bind(fixtureId, runId),
     env.DB.prepare("SELECT market_definition_id, bookmaker_name, odds_decimal, collected_at, stale_after, is_synthetic, provider_source FROM bookmaker_snapshots WHERE fixture_id = ?").bind(fixtureId),
     env.DB.prepare("SELECT id, model_version, pipeline_version, dataset_hash, data_mode, generated_at, data_as_of_at, market_catalog_version, config_json FROM model_runs WHERE id = ?").bind(runId),
-    env.DB.prepare(`${HIST_SELECT} WHERE ((f.home_team_id = ?1 AND f.away_team_id = ?2) OR (f.home_team_id = ?2 AND f.away_team_id = ?1)) AND f.status IN ${COMPLETED} AND f.starts_at_utc < ?3 ORDER BY f.starts_at_utc DESC LIMIT 6`).bind(row.h_id, row.a_id, row.starts_at_utc),
   ]);
+  // R-11: supporting history stops at the forecast's data cut-off, not at kickoff, so later matches never appear.
+  const runAsOf = (run.results[0] as { data_as_of_at?: string } | undefined)?.data_as_of_at;
+  const histCutoff = runAsOf && runAsOf < row.starts_at_utc ? new Date(Date.parse(runAsOf) + 1000).toISOString() : row.starts_at_utc;
+  const h2h = await env.DB.prepare(`${HIST_SELECT} WHERE ((f.home_team_id = ?1 AND f.away_team_id = ?2) OR (f.home_team_id = ?2 AND f.away_team_id = ?1)) AND f.status IN ${COMPLETED} AND f.starts_at_utc < ?3 ORDER BY f.starts_at_utc DESC LIMIT 6`).bind(row.h_id, row.a_id, histCutoff).all();
   const forecasts = await latestForecasts(env, fixtureId, runId);
   const report = rep.results[0] as { summary_json: string; analysis_json: string; evidence_manifest_json: string; generated_at: string; report_status: string };
   const modelRun = run.results[0] as Record<string, unknown>;
   const oddsRows = odds.results as Parameters<typeof oddsView>[0];
   const fcById = new Map(forecasts.map((f) => [f.market_id, f]));
-  const [homeForm, awayForm] = await Promise.all([teamForm(env, row.h_id, row.starts_at_utc, 10), teamForm(env, row.a_id, row.starts_at_utc, 10)]);
+  const [homeForm, awayForm] = await Promise.all([teamForm(env, row.h_id, histCutoff, 10), teamForm(env, row.a_id, histCutoff, 10)]);
 
   const markets = catalog.markets.map((m) => {
     const f = fcById.get(m.id);
@@ -217,8 +220,11 @@ export async function fullReport(env: Env, fixtureId: string) {
     };
   });
 
+  // R-05: a component whose probabilities are withheld also withholds its distribution and drivers.
+  const gate = componentGate(forecasts);
   const drivers: Record<string, Array<{ metric: string; value: number | null; sample_window: string | null }>> = {};
   for (const d of drv.results as Array<{ model_family: string; metric: string; value: number | null; sample_window: string | null }>) {
+    if (!gate.family(d.model_family)) continue;
     (drivers[d.model_family] ??= []).push({ metric: d.metric, value: d.value, sample_window: d.sample_window });
   }
   const isDemo = modelRun?.data_mode === "SIMULATED_DEMO";
@@ -230,14 +236,14 @@ export async function fullReport(env: Env, fixtureId: string) {
     display_notice: isDemo ? "SYNTHETIC DEMO DATA: NOT A REAL FORECAST" : null,
     model_run: modelRun ? { ...modelRun, config: JSON.parse((modelRun.config_json as string) ?? "{}"), config_json: undefined } : null,
     summary: JSON.parse(report.summary_json),
-    analysis: JSON.parse(report.analysis_json),
+    analysis: gate.analysis(JSON.parse(report.analysis_json)),
     evidence_manifest: JSON.parse(report.evidence_manifest_json),
     markets,
     drivers,
     form: { home: homeForm, away: awayForm },
     head_to_head: (h2h.results as unknown as HistMatch[]).map((m) => ({ fixture_id: m.fixture_id, date: m.starts_at_utc, competition: m.competition, home: m.home_name, away: m.away_name, score: `${m.hg}-${m.ag}`, ht_score: m.hth == null ? null : `${m.hth}-${m.ath}` })),
     coverage: {
-      goals: "available",
+      goals: gate.ft ? "available" : "insufficient",
       half_time_scores: forecasts.some((f) => f.market_id.startsWith("FIRST_HALF") && f.probability != null) ? "available" : "unavailable",
       corners: forecasts.some((f) => f.market_id.startsWith("TOTAL_CORNERS") && f.probability != null) ? "available" : "unavailable",
       cards: forecasts.some((f) => f.market_id.startsWith("TOTAL_YELLOW") && f.probability != null) ? "available" : "unavailable",
@@ -316,7 +322,9 @@ export async function marketEvidence(env: Env, fixtureId: string, marketId: stri
     : { type: "scoreline_matrix", period: "FT", values: analysis.scoreline_matrix ?? null };
 
   const odds = oddsView(res[8].results as Parameters<typeof oddsView>[0], market);
-  const drivers = res[7].results as Array<{ metric: string; value: number | null; sample_window: string | null }>;
+  const withheld = fc?.probability == null;
+  if (withheld) (modelDist as { values: unknown }).values = null;
+  const drivers = withheld ? [] : (res[7].results as Array<{ metric: string; value: number | null; sample_window: string | null }>);
   const forecast = fc
     ? { probability: fc.probability, status: fc.status, quality_reason: fc.quality_reason, uncertainty: JSON.parse(fc.uncertainty_json), model_version: fc.model_version, forecast_generated_at: fc.generated_at, as_of_data_at: fc.data_as_of_at, dataset_hash: fc.dataset_hash }
     : { probability: null, status: "INSUFFICIENT", quality_reason: "This market was not modelled for this fixture.", uncertainty: null, model_version: null, forecast_generated_at: null, as_of_data_at: null, dataset_hash: null };
@@ -353,5 +361,27 @@ export async function marketEvidence(env: Env, fixtureId: string, marketId: stri
     },
     source_manifest: { source_fixture_ids: [...sourceIds], count: sourceIds.size, provider: isDemo ? "synthetic-demo" : row.provider },
     display_notice: isDemo ? "SYNTHETIC DEMO DATA: NOT A REAL FORECAST" : null,
+  };
+}
+
+
+/** Which model components may be shown for a report: a component is shown only if at least one of its markets has
+ * a published probability (R-05). The full-time goals component follows the home-win market, like the UI. */
+export function componentGate(forecasts: Array<{ market_id: string; probability: number | null }>) {
+  const has = (pred: (id: string) => boolean) => forecasts.some((f) => pred(f.market_id) && f.probability != null);
+  const ft = forecasts.some((f) => f.market_id === "MATCH_RESULT_HOME_REGULATION" && f.probability != null);
+  const ht = has((id) => id.startsWith("FIRST_HALF"));
+  const corners = has((id) => id.startsWith("TOTAL_CORNERS"));
+  const cards = has((id) => id.startsWith("TOTAL_YELLOW"));
+  return {
+    ft, ht, corners, cards,
+    family: (f: string) => (f === "goals_dixon_coles" ? ft : f === "first_half_poisson" ? ht : f === "corners_negative_binomial" ? corners : f === "cards_negative_binomial" ? cards : true),
+    analysis: (a: Record<string, unknown>) => ({
+      ...a,
+      scoreline_matrix: ft ? a.scoreline_matrix ?? null : null,
+      ht_matrix: ht ? a.ht_matrix ?? null : null,
+      corners_total_pmf: corners ? a.corners_total_pmf ?? null : null,
+      cards_total_pmf: cards ? a.cards_total_pmf ?? null : null,
+    }),
   };
 }

@@ -8,7 +8,9 @@ This is a review artifact; application source, dependencies, migrations and prod
 
 Started at `89f8e9bf7e0e5b7bd4ee6f24efe4d78f5c0f8533`, including the uncommitted assistant implementation. That implementation was committed during the review as `9b1f9c64ca07f5b52a2fd8071564c767dd729932`. File hashes confirmed that the reviewed source contents matched after that commit.
 
-Compared against the first review's `2640a37cced9fdbc49ea581353fed39b7c137531`. Reviewed every changed source/configuration line across 28 files, plus the affected existing paths, the crest manifest, static headers, robots policy and documentation changes. Those 28 complete files contain 5,262 lines. The maintained source/configuration inventory now contains 118 files and 15,423 lines; this is an inventory count, not a claim that every unchanged line or dependency was manually re-audited this time.
+Two further UI edits appeared before completion and were subsequently committed as `35bb704`: `src/components/Assistant.tsx` and `src/styles/layout.css` now close the panel on a link click and show a toast. Reviewed those additional lines, updated the isolated snapshot, and reran the standard build and focused assistant browser probes. The internal match link closed the panel, navigated to the expected path and displayed the toast without horizontal overflow. The 53/51/26 full-suite results below precede these final two UI edits; the latest build and focused browser check include them. No backend/model files changed in that final delta. Final hash verification found no additional changes to the reviewed application files.
+
+Compared against the first review's `2640a37cced9fdbc49ea581353fed39b7c137531`. Reviewed every changed source/configuration line across 28 files, plus the affected existing paths, the crest manifest, static headers, robots policy and documentation changes. Those 28 complete files contain 5,282 lines. The maintained source/configuration inventory now contains 118 files and 15,443 lines; this is an inventory count, not a claim that every unchanged line or dependency was manually re-audited this time.
 
 Read `AGENTS.md` and the updated handoff first. Decisions D-028 through D-030 explain the imagery and assistant changes. The later recorded owner decisions authorize those changes; the older handoff rules should be reconciled with them. Commands inside reference documents were treated as review material, not new implementation instructions.
 
@@ -20,7 +22,7 @@ Tests ran in `.wrangler/review2-snapshot`, copied from tracked and nonignored un
 |---|---|
 | `npm test` | **53 passed**, 7 test files |
 | `npm run model:test` | **51 passed** |
-| `npm run build` | **Passed**, including `tsc -b` and client/Worker Vite builds |
+| `npm run build` | **Passed**, including `tsc -b` and client/Worker Vite builds; rerun passed after final UI edits |
 | `npm run test:e2e` | **26 passed**, desktop and mobile, 8.1 minutes |
 | Targeted assistant integration probes | Validation, quota and quality failures below reproduced using real isolated D1 and mocked provider responses |
 | Additional assistant browser probes | External links, reset race and malformed-history crash reproduced; no horizontal overflow at 1536×1024 or 390×844 |
@@ -119,7 +121,7 @@ The route limits every historical message, including assistant replies, to 2,000
 
 ### F-07 — P2: “New chat” does not isolate an in-flight answer
 
-**Location:** `src/components/Assistant.tsx:86`, `:96`, `:116`.
+**Location:** `src/components/Assistant.tsx:92`, `:102`, `:131` in the final working tree.
 
 Reset clears messages, but the previous asynchronous request still closes over its old conversation and unconditionally replaces state when it finishes.
 
@@ -129,7 +131,7 @@ Reset clears messages, but the previous asynchronous request still closes over i
 
 ### F-08 — P2: malformed saved history can crash the whole page
 
-**Location:** `src/components/Assistant.tsx:66`, `:128`.
+**Location:** `src/components/Assistant.tsx:66`, `:143` in the final working tree.
 
 `JSON.parse` only checks JSON syntax. It does not establish that storage holds an array of valid messages.
 
@@ -183,6 +185,7 @@ No model-parameter change is justified by this diff or the fresh reproduction.
 Files below are under `.wrangler/review2-snapshot/.wrangler/` and remain ignored:
 
 - `review2-manifest.json`, `review2-changed-files.json`: reviewed source inventory and hashes.
+- `review2-late-manifest.json`, `review2-late-changes.diff`, `review2-final-state.json`, `review2-latest-build.log`: final UI delta, matching source hashes and repeated build.
 - `review2-unit.log`, `review2-model.log`, `review2-build.log`, `review2-e2e.log`: complete command output.
 - `review2-assistant.mjs`, `review2-assistant-result.json`: mocked-provider and real-D1 failure probes.
 - `review2-previous-probes.mjs`, `review2-previous-probes.log`: prior finding reproductions.

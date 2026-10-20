@@ -37,10 +37,10 @@ class NBFit:
         b = self.beta if beta is None else beta
         return float(np.exp(xrow @ b))
 
-    def sample(self, n: int, rng: np.random.Generator) -> np.ndarray:
+    def sample(self, n: int, rng: np.random.Generator) -> np.ndarray | None:
         full = np.concatenate([self.beta, [self.log_alpha]])
         if self.cov is None:
-            return np.repeat(full[None, :], n, axis=0)
+            return None  # R-07: no covariance, no draws
         return rng.multivariate_normal(full, self.cov, size=n, check_valid="ignore", method="eigh")
 
 
@@ -87,7 +87,9 @@ def fit_nb(
             H = _numeric_hessian(nll, res.x, free)
             cov = np.linalg.inv(H)
             cov = (cov + cov.T) / 2
-        except np.linalg.LinAlgError:
+        except (np.linalg.LinAlgError, ValueError):
+            cov = None
+        if cov is not None and not np.all(np.isfinite(cov)):
             cov = None
 
     return NBFit(
@@ -103,6 +105,16 @@ def fit_nb(
     )
 
 
+def fold_tail(pmf: np.ndarray) -> np.ndarray:
+    """R-18: put all omitted upper-tail mass into the last bucket ("N or more") instead of renormalising it away, so
+    every over/under threshold below the last bucket keeps its exact probability."""
+    out = np.clip(np.asarray(pmf, dtype=float), 0, None).copy()
+    out[-1] += max(0.0, 1.0 - float(out.sum()))
+    return out
+
+
 def convolve_pmfs(a: np.ndarray, b: np.ndarray, size: int) -> np.ndarray:
-    out = np.convolve(a, b)[:size]
-    return out / out.sum()
+    full = np.convolve(fold_tail(a), fold_tail(b))
+    out = full[:size].copy()
+    out[-1] += float(full[size:].sum())
+    return out

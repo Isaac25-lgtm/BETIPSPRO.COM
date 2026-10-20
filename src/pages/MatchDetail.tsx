@@ -235,6 +235,18 @@ const BASE_MARKETS: Array<[string, string]> = [
   ["BTTS_YES_REGULATION", "Both teams score"], ["FIRST_HALF_GOALS_OVER_0_5", "Goal before half-time"],
 ];
 
+function exactTotals(r: Report) {
+  const p = (id: string) => r.markets.find((m) => m.id === id)?.probability;
+  const h = p("MATCH_RESULT_HOME_REGULATION"), d = p("MATCH_RESULT_DRAW_REGULATION"), a = p("MATCH_RESULT_AWAY_REGULATION");
+  return h != null && d != null && a != null ? { home: h, draw: d, away: a } : undefined;
+}
+
+function expectedGoals(r: Report) {
+  const g = r.drivers.goals_dixon_coles ?? [];
+  const h = g.find((d) => d.metric === "expected_goals_home")?.value, a = g.find((d) => d.metric === "expected_goals_away")?.value;
+  return h != null && a != null ? h + a : null;
+}
+
 function baseRows(r: Report) {
   const base = r.summary.baselines ?? {};
   const by = new Map(r.markets.map((m) => [m.id, m.probability]));
@@ -299,8 +311,8 @@ function ReportView({ p, r, tab, setTab }: { p: Preview; r: Report; tab: TabId; 
         )}
         {tab === "goals" && (
           <>
-            {r.analysis.scoreline_matrix && <section className="card card-pad"><ScorelineHeatmap matrix={r.analysis.scoreline_matrix} home={f.home.name} away={f.away.name} title="Scoreline distribution (model)" /></section>}
-            {r.analysis.scoreline_matrix && <section className="card card-pad"><TotalGoalsChart matrix={r.analysis.scoreline_matrix} title="Total goals in the match (model)" /></section>}
+            {r.analysis.scoreline_matrix && <section className="card card-pad"><ScorelineHeatmap matrix={r.analysis.scoreline_matrix} home={f.home.name} away={f.away.name} title="Scoreline distribution (model)" totals={exactTotals(r)} /></section>}
+            {r.analysis.scoreline_matrix && <section className="card card-pad"><TotalGoalsChart matrix={r.analysis.scoreline_matrix} title="Total goals in the match (model)" expectedGoals={expectedGoals(r)} under25={get("TOTAL_GOALS_UNDER_2_5_REGULATION")?.probability ?? null} /></section>}
             <section className="card card-pad">
               <h2 className="h-card">Goal thresholds</h2>
               <MarketList markets={r.markets.filter((m) => ["TOTAL_GOALS", "BTTS", "TEAM_GOALS"].includes(m.family))} fixtureId={f.id} />

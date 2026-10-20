@@ -6,6 +6,7 @@ import { publicRoutes } from "./routes/public.ts";
 import { accountRoutes } from "./routes/account.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { scheduledRefresh } from "./services/sports/ingestion.ts";
+import { settlePreKickoff } from "./services/settlement.ts";
 
 export const app = new Hono<AppBindings>();
 
@@ -35,7 +36,7 @@ export default {
   fetch: app.fetch,
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(
-      scheduledRefresh(env).then((r) => console.log(JSON.stringify({ level: "info", cron: "ingestion", result: r }))),
+      Promise.all([scheduledRefresh(env), settlePreKickoff(env)]).then(([r, s]) => console.log(JSON.stringify({ level: "info", cron: "daily", ingestion: r, settlement: s }))),
     );
   },
 } satisfies ExportedHandler<Env>;

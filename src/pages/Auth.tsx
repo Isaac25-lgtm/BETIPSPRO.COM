@@ -5,7 +5,13 @@ import { api, ApiError, invalidate } from "../lib/api";
 import { Logo } from "../components/ui";
 
 function safeNext(n: string | null) {
-  return n && n.startsWith("/") && !n.startsWith("//") ? n : "/app";
+  if (!n || !n.startsWith("/") || n.startsWith("//") || n.includes("\\")) return "/app";
+  try {
+    const u = new URL(n, window.location.origin);
+    return u.origin === window.location.origin ? u.pathname + u.search + u.hash : "/app";
+  } catch {
+    return "/app";
+  }
 }
 
 export default function Login() {

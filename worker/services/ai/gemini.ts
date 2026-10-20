@@ -87,7 +87,9 @@ export async function generateSummary(env: Env, input: { fixtureId: string; mark
   ].join("\n");
   const token = await accessToken(env.VERTEX_SERVICE_ACCOUNT_JSON!);
   const loc = env.VERTEX_LOCATION ?? "us-central1";
-  const url = `https://${loc}-aiplatform.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/${loc}/publishers/google/models/${env.VERTEX_MODEL ?? "gemini-2.5-flash"}:generateContent`;
+  const model = env.VERTEX_MODEL ?? "gemini-2.5-flash";
+  if (!/^gemini-[\d.]+-flash(-lite)?$/.test(model)) throw new ApiError(503, "FEATURE_DISABLED", "Only Gemini Flash models are allowed for summaries.");
+  const url = `https://${loc}-aiplatform.googleapis.com/v1/projects/${env.VERTEX_PROJECT_ID}/locations/${loc}/publishers/google/models/${model}:generateContent`;
   const res = await fetch(url, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -96,6 +98,7 @@ export async function generateSummary(env: Env, input: { fixtureId: string; mark
       generationConfig: {
         temperature: 0.2,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
+        thinkingConfig: { thinkingBudget: 0 },
         responseMimeType: "application/json",
         responseSchema: { type: "OBJECT", properties: { summary: { type: "STRING" }, key_points: { type: "ARRAY", items: { type: "STRING" } } }, required: ["summary", "key_points"] },
       },

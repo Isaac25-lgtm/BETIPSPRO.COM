@@ -120,9 +120,15 @@ export function DemoPill({ dark = false, label = "Synthetic demo" }: { dark?: bo
   );
 }
 
-export function ProbBar({ p, lo, hi, width = 88, tone = "green" }: { p: number | null; lo?: number; hi?: number; width?: number; tone?: "green" | "blue" }) {
+/** Meter colour by probability: green >= 65%, amber 40-65%, red below 40% (owner spec 2026-10-20). */
+export function probTone(p: number | null | undefined): "high" | "mid" | "low" | "none" {
+  if (p == null) return "none";
+  return p >= 0.65 ? "high" : p >= 0.4 ? "mid" : "low";
+}
+
+export function ProbBar({ p, lo, hi, width = 88, tone }: { p: number | null; lo?: number; hi?: number; width?: number; tone?: "green" | "blue" }) {
   return (
-    <span className={`prob-bar prob-${tone}`} style={{ width }} role="img" aria-label={p == null ? "No probability" : `${Math.round(p * 100)} percent`}>
+    <span className={`prob-bar ${tone === "blue" ? "prob-blue" : `prob-${probTone(p)}`}`} style={{ width }} role="img" aria-label={p == null ? "No probability" : `${Math.round(p * 100)} percent`}>
       {lo != null && hi != null && <span className="prob-interval" style={{ left: `${lo * 100}%`, width: `${Math.max((hi - lo) * 100, 1)}%` }} />}
       {p != null && <span className="prob-fill" style={{ width: `${Math.max(p * 100, 1.5)}%` }} />}
     </span>

@@ -6,7 +6,7 @@ import { useAuth } from "../app/auth";
 import { useApi } from "../lib/api";
 import { addDays, kickoffDate, kickoffTime, longDate, odds, pct, eatYmd } from "../lib/format";
 import type { FixtureList, FixtureSummary, Report } from "../lib/types";
-import { CompMark, DemoPill, ErrorState, ProbBar, Skeleton, TeamBadge, teamLabel } from "../components/ui";
+import { probTone, CompMark, DemoPill, ErrorState, ProbBar, Skeleton, TeamBadge, teamLabel } from "../components/ui";
 
 /**
  * TESTING-PHASE reference hero and league tiles (real players + league logos from the owner's reference
@@ -204,7 +204,7 @@ function InsightRow({ f, showOdds }: { f: FixtureSummary; showOdds: boolean }) {
       <td>
         <span className="conf-cell">
           <ProbBar p={f.featured?.probability ?? null} width={80} />
-          <span className="num conf-pct">{pct(f.featured?.probability)}</span>
+          <span className={`num conf-pct pct-${probTone(f.featured?.probability)}`}>{pct(f.featured?.probability)}</span>
         </span>
       </td>
       <td>
@@ -233,7 +233,7 @@ function InsightCard({ f, showOdds }: { f: FixtureSummary; showOdds: boolean }) 
         <div className="ic-market">
           <span className="ic-label">{f.featured?.short_label}</span>
           <ProbBar p={f.featured?.probability ?? null} width={64} />
-          <span className="num conf-pct">{pct(f.featured?.probability)}</span>
+          <span className={`num conf-pct pct-${probTone(f.featured?.probability)}`}>{pct(f.featured?.probability)}</span>
           {showOdds && <OddsCell f={f} />}
           <ChevronRight size={18} className="muted" aria-hidden="true" />
         </div>

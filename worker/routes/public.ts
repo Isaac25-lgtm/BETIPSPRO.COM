@@ -9,6 +9,7 @@ import { catalog, marketById } from "../../shared/markets.ts";
 import { fixturePreview, listFixtures, realDataReady } from "../services/fixtures.ts";
 import { publicCache } from "../middleware/public-cache.ts";
 import { openAccess } from "../services/access.ts";
+import { assistantEnabled } from "../services/assistant.ts";
 import { reportOverview } from "../services/overview.ts";
 
 const PUBLIC_CACHE = "public, max-age=30, s-maxage=60, stale-while-revalidate=120";
@@ -40,6 +41,7 @@ publicRoutes.get("/config/public", async (c) => {
     max_beta_users: num(c.env.MAX_BETA_USERS, 5),
     beta_initial_credits: num(c.env.BETA_INITIAL_CREDITS, 10),
     ai_explanations_enabled: flag(c.env.AI_EXPLANATIONS_ENABLED),
+    assistant_enabled: await assistantEnabled(c.env),
     turnstile_enabled: flag(c.env.TURNSTILE_ENABLED),
     performance_only_verified: flag(c.env.PUBLIC_PERFORMANCE_ONLY_VERIFIED),
     market_catalog_version: catalog.version,

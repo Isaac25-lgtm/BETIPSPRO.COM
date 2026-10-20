@@ -62,6 +62,8 @@
         "SPORTS_API_PER_MINUTE_MAX": "10",
         "AI_EXPLANATIONS_ENABLED": "true",
         "AI_MONTHLY_BUDGET_USD": "10",
+        "ASSISTANT_ENABLED": "true",
+        "ASSISTANT_DAILY_LIMIT": "1500",
         "PAYMENTS_ENABLED": "false",
         "BETA_INVITE_ONLY": "true",
         "MAX_BETA_USERS": "5",

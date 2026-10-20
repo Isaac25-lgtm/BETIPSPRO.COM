@@ -4,6 +4,7 @@ import { BarChart3, CalendarDays, FileText, Home, LogOut, Menu, Search, Shield, 
 import { brand } from "../../shared/brand";
 import { Logo } from "../components/ui";
 import { useAuth } from "./auth";
+import { Assistant } from "../components/Assistant";
 
 const NAV = [
   { to: "/", label: "Home", end: true },
@@ -126,6 +127,7 @@ export function Layout() {
         <Outlet />
       </main>
       <Footer />
+      {!loc.pathname.startsWith("/admin") && <Assistant />}
 
       <nav className="tabbar" aria-label="Quick navigation">
         <NavLink to="/" end className="tab"><Home size={21} /><span>Home</span></NavLink>

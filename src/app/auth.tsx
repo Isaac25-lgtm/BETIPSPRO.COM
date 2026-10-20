@@ -12,6 +12,7 @@ export interface PublicConfig {
   synthetic_data_present: boolean;
   /** Testing phase: every report is open to everyone, no credits needed. */
   open_access: boolean;
+  assistant_enabled?: boolean;
   payments_enabled: boolean;
   invite_only: boolean;
   max_beta_users: number;

@@ -358,3 +358,12 @@ cd model-pipeline && python -m pip install -e ".[dev]"   # numpy, scipy, pandas,
   outcome happened in that league before the cut-off. **Backtest:** forecasts computed after the fact using only data
   available before each match. **Report version:** the model run id a match report belongs to. **Open access:**
   testing mode where all reports are free. **INSUFFICIENT:** not enough data to publish a probability.
+
+## 18. Updates after the first handoff (same day)
+
+- **Ask BetTipsPro AI** (`worker/services/assistant.ts`, `src/components/Assistant.tsx`, D-030): DeepSeek `deepseek-flash` with tool calling over the site's own forecasts. Secret `DEEPSEEK_API_KEY` (local `.dev.vars`, production Worker secret). 30 questions/visitor/hour, 1,500/day. Tests in `tests/integration/assistant.test.ts` never call DeepSeek.
+- **Testing-phase reference assets** (D-029): real players and league logos (hero, tiles, match headers) and real club crests are on the live site while testing, controlled by `VITE_LOCAL_REFERENCE_HERO=true` in the owner's `.env.local`. Image files (`public/images/local/`, `public/crests/`) are gitignored; the crest manifest is committed; `scripts/fetch-crests.py` regenerates crests from stored football-data.org responses. The site sends noindex. **Remove before payments** (release checklist).
+- **Original art fallback** (D-028): natural-light generated hero and tiles in `public/images/`, used when the switch is off.
+- **Charts**: model vs league average, total goals distribution, form timeline (`src/components/charts.tsx`). Meters: green >= 65%, amber 40-65%, red < 40%.
+- **Performance** (D-028): Smart Placement, migration 0005 indexes, cache TTLs, immutable assets. Measure with `node tests/performance/latency.mjs <url>`.
+- **Code review** by another agent: `docs/reviews/2026-10-20-code-and-model-review.md`.

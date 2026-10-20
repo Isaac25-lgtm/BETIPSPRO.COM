@@ -17,6 +17,7 @@ export type ErrorCode =
   | "BUDGET_EXHAUSTED"
   | "PROVIDER_UNCONFIGURED"
   | "FEATURE_DISABLED"
+  | "UPSTREAM_ERROR"
   | "INTERNAL";
 
 export class ApiError extends Error {

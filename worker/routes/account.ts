@@ -11,6 +11,7 @@ import {
 } from "../services/auth.ts";
 import { ENTITLEMENT_SCOPE, getBalance, hasEntitlement, unlockReport } from "../services/credits.ts";
 import { openAccess } from "../services/access.ts";
+import { assistantEnabled, chat, rateLimit } from "../services/assistant.ts";
 import { fullReport, marketEvidence } from "../services/evidence.ts";
 import { cached } from "../services/cache.ts";
 import { cachedSummary } from "../services/ai/gemini.ts";
@@ -158,6 +159,15 @@ async function canView(c: Context<AppBindings>, fixtureId: string): Promise<"sam
   if (await hasEntitlement(c.env, u.id, fixtureId)) return "entitled";
   throw new ApiError(403, "REPORT_LOCKED", "Unlock this match report to view its full analysis (1 credit; all markets included).", { balance: await getBalance(c.env, u.id) });
 }
+
+// Ask BetTipsPro AI: answers only from the site's forecasts via read-only tools; per-visitor and daily limits.
+accountRoutes.post("/assistant/chat", async (c) => {
+  if (!(await assistantEnabled(c.env))) throw new ApiError(404, "NOT_FOUND", "The assistant is not available right now.");
+  const b = await body(c, z.object({ messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(2000) })).min(1).max(16) }));
+  if (b.messages[b.messages.length - 1].role !== "user") throw new ApiError(400, "BAD_REQUEST", "The last message must be a question.");
+  await rateLimit(c.env, await ipHash(c));
+  return ok(c, await chat(c.env, b.messages));
+});
 
 accountRoutes.post("/fixtures/:id/unlock", async (c) => {
   const u = requireUser(c);

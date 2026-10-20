@@ -374,18 +374,18 @@
 .lt-tag i { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.7); }
 @media (max-width: 560px) { .league-tile-photo .lt-inner { padding-left: 40%; } .league-tile-photo .lt-title { font-size: 17px; } }
 
-/* Phones: light, natural hero copy under the photo band (owner preference 2026-10-20: natural over dark). */
+/* Phones: the copy sits on a blurred, softly darkened continuation of the hero photo, so the whole hero reads as one
+   natural stadium scene (owner preference 2026-10-20, "like the Beta access card"). */
+.hero { --hero-bg-img: url(/images/hero-desktop-1600.webp); }
+.ref-assets .hero { --hero-bg-img: url(/images/local/hero-desktop-1600.webp); }
 @media (max-width: 767px) {
-  .hero { background: linear-gradient(180deg, #ffffff 0%, var(--page) 100%); color: var(--text); border-bottom: 1px solid var(--line); }
-  .hero-art::after { background: linear-gradient(180deg, rgba(255,255,255,0) 62%, #ffffff 100%); }
-  .hero-title { color: var(--navy-950); text-shadow: none; }
-  .hero-title .hl { color: var(--accent-ink); }
-  .hero-lede { color: var(--text-2); text-shadow: none; }
-  .hero-eyebrow { color: var(--muted); }
-  .hero-secondary { color: var(--navy-950); opacity: 1; text-shadow: none; }
-  .hero-cta { box-shadow: 0 6px 18px rgba(2, 172, 79, .22); }
-  .hero-stats { border-top-color: var(--line); }
-  .hero-stats > div { border-left-color: var(--line); }
-  .hero-stats dd { color: var(--navy-950); }
-  .hero-stats dt { color: var(--muted); }
+  .hero { background: #0b2422; }
+  .hero::before { content: ""; position: absolute; inset: -40px; z-index: -1; background: var(--hero-bg-img) 72% 40% / cover no-repeat; filter: blur(26px) saturate(1.35) brightness(.78); transform: scale(1.2); }
+  .hero::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,26,28,0) 30%, rgba(0,26,28,.22) 70%, rgba(0,26,28,.4) 100%); }
+  .hero-art::after { display: none; }
+  .hero-art img { -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent 100%); mask-image: linear-gradient(180deg, #000 62%, transparent 100%); }
+  .hero-title, .hero-lede { text-shadow: 0 1px 12px rgba(0,0,0,.35); }
+  .hero-stats { border-top-color: rgba(255,255,255,.16); }
+  .hero-stats > div { border-left-color: rgba(255,255,255,.16); }
+  .hero-stats dt { color: rgba(255,255,255,.75); }
 }

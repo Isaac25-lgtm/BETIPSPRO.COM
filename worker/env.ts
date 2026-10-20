@@ -31,6 +31,10 @@ export interface Env {
   VERTEX_LOCATION?: string;
   VERTEX_MODEL?: string;
   GIT_COMMIT?: string;
+  // Ask BetTipsPro AI (DeepSeek); key is a secret, never logged
+  DEEPSEEK_API_KEY?: string;
+  ASSISTANT_ENABLED?: string;
+  ASSISTANT_DAILY_LIMIT?: string;
 }
 
 export interface SessionUser {

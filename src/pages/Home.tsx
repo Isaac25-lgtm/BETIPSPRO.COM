@@ -42,7 +42,7 @@ function Hero() {
   const { config } = useAuth();
   const board = useTodayBoard();
   const today = board.data?.items.filter((f) => f.featured).length;
-  const sample = board.data?.items.find((f) => f.is_public_sample);
+  const sample = showcaseFixture(board.data?.items, config?.open_access);
   return (
     <section className="hero" aria-labelledby="hero-title">
       <picture className={`hero-art ${LOCAL_REFERENCE_HERO ? "hero-art-local" : ""}`}>
@@ -81,7 +81,7 @@ function Hero() {
             </Link>
             {sample && (
               <Link to={`/matches/${encodeURIComponent(sample.id)}`} className="hero-secondary">
-                See a free sample report <ArrowRight size={16} />
+                {config?.open_access ? "See a full match report" : "See a free sample report"} <ArrowRight size={16} />
               </Link>
             )}
           </div>
@@ -100,6 +100,18 @@ function Hero() {
       </div>
     </section>
   );
+}
+
+/**
+ * The match the homepage previews: the admin-flagged free sample, or, while every report is open (testing),
+ * the next featured match today so the preview is never empty.
+ */
+function showcaseFixture(items: FixtureSummary[] | undefined, open: boolean | undefined): FixtureSummary | undefined {
+  const list = items ?? [];
+  const flagged = list.find((f) => f.is_public_sample);
+  if (flagged || !open) return flagged;
+  const featured = list.filter((f) => f.featured);
+  return featured.find((f) => Date.parse(f.starts_at_utc) > Date.now()) ?? featured[0];
 }
 
 function useTodayBoard() {
@@ -332,9 +344,10 @@ type ArchiveItem = { id: string; fixture_id: string; market_label: string; proba
 
 /** Dark showcase: what a credit unlocks, with a live preview built from the free sample report. */
 function ReportShowcase() {
+  const { config } = useAuth();
   const board = useTodayBoard();
-  const sample = board.data?.items.find((f) => f.is_public_sample);
-  const { data: r } = useApi<Report>(sample ? `/fixtures/${encodeURIComponent(sample.id)}/report` : null, { ttlMs: 300_000 });
+  const sample = showcaseFixture(board.data?.items, config?.open_access);
+  const { data: r, loading: reportLoading } = useApi<Report>(sample ? `/fixtures/${encodeURIComponent(sample.id)}/report` : null, { ttlMs: 300_000 });
   const get = (id: string) => r?.markets.find((m) => m.id === id);
   const candidates: Array<[string, string]> = [
     ["TOTAL_GOALS_OVER_2_5_REGULATION", "Over 2.5 goals"],
@@ -359,11 +372,11 @@ function ReportShowcase() {
           </ul>
           {sample && (
             <Link to={`/matches/${encodeURIComponent(sample.id)}`} className="btn btn-primary btn-lg">
-              Open a free sample report <ArrowRight size={18} />
+              {config?.open_access ? "Open the full report" : "Open a free sample report"} <ArrowRight size={18} />
             </Link>
           )}
         </div>
-        <div className="report-preview">
+        {(board.loading || reportLoading || (sample && r)) && <div className="report-preview">
           {sample && r ? (
             <>
               <div className="rp-head">
@@ -399,7 +412,7 @@ function ReportShowcase() {
           ) : (
             <div className="rp-skeleton" />
           )}
-        </div>
+        </div>}
       </div>
     </section>
   );
